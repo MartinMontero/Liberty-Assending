@@ -136,8 +136,38 @@ function boot() {
 
   const hud = new HUD();
   const audio = new AudioEngine();
+
+  // ---- the Fellowship's ledger: items, liberated chapters, zone services ----
+  world.inventory = new Set();
+  world.grant = (id, label) => {
+    if (world.inventory.has(id)) return;
+    world.inventory.add(id);
+    hud.setInventory([...world.inventory].map(k => INV_LABELS[k] || k));
+    hud.toast(`✦ ACQUIRED — ${label}`, 5);
+    audio.sfx('lore');
+  };
+  world.has = (id) => world.inventory.has(id);
+  world.liberated = new Set();
+  world.liberate = (id, label) => {
+    if (world.liberated.has(id)) return;
+    world.liberated.add(id);
+    hud.toast(`⚑ ${label} — CHAPTER LIBERATED &nbsp;(${world.liberated.size}/6)`, 7);
+    audio.sfx('plant');
+  };
+  world.notify = (msg, sec = 5) => hud.toast(msg, sec);
+  world.sfx = (k) => audio.sfx(k);
+  const INV_LABELS = {
+    shard: 'NEURAL LACE SHARD',
+    countermeme: '“I’M A THREAT? GOOD.”',
+    marseillaise: 'MARSEILLAISE, FIRST DRAFT',
+    lullaby: 'MARIA’S LULLABY',
+    floppy: 'FLOPPY OF LABOR HISTORY',
+    cassette: 'CASSETTE — HER VOICE',
+    dial: 'ROTARY DIAL',
+  };
   const player = new Player(camera, renderer.domElement, TEST);
   const torch = new TorchSystem(scene, camera, world, hud, audio);
+  world.torchRef = torch;
 
   // ---------- objectives ----------
   const visitedAll = () => travel.visited.size >= world.zones.length;
@@ -146,7 +176,7 @@ function boot() {
   function objective() {
     switch (stage) {
       case 0: return 'Find Liberty’s torch in the burning factory';
-      case 1: return 'Hold LMB — flare the torch and reveal the Ring’s hidden architecture';
+      case 1: return 'Hold F — flare the torch and reveal the Ring’s hidden architecture';
       case 2: return 'Press T — ask the torch to carry you into the story';
       case 3: return `Walk every chapter of the fable (${travel.visited.size}/${world.zones.length})`;
       case 4: return 'Find the story circle in the Garden — plant the future (E)';
@@ -196,8 +226,12 @@ function boot() {
     }
     for (const it of z.interactables) {
       if (it.once && it.used) continue;
+      if (it.when && !it.when()) continue;
       const d = Math.hypot(player.feet.x - it.pos.x, player.feet.z - it.pos.z);
       if (d < it.radius && d < bestD) { best = it; bestD = d; }
+    }
+    if (best && typeof best.prompt === 'function') {
+      return { ...best, prompt: best.prompt(), onUse: best.onUse, _src: best };
     }
     return best;
   }
@@ -209,7 +243,7 @@ function boot() {
       advance();
       return;
     }
-    const it = currentInteract;
+    const it = currentInteract._src || currentInteract;
     if (it.once) it.used = true;
     const text = it.onUse();
     if (it === plantSpot) return; // plant handles its own feedback
@@ -230,7 +264,13 @@ function boot() {
         garden.plantSapling();
         planted = true;
         audio.sfx('plant');
-        hud.toast('An acorn goes into the broken ground. Somewhere beyond the haze, an algorithm fails to notice.', 6);
+        if (world.liberated.size >= 6) {
+          garden.trueEnding?.();
+          hud.finale('“The revolution is growing at the speed of soil.”', 'ALL CHAPTERS LIBERATED — THE LONG BEGINNING', 12);
+          audio.sfx('finale');
+        } else {
+          hud.toast(`An acorn goes into the broken ground. ${6 - world.liberated.size} chapter${world.liberated.size === 5 ? '' : 's'} of the Ring still stand — press T, the torch knows the way.`, 7);
+        }
         advance();
         return null;
       },
@@ -247,7 +287,8 @@ function boot() {
     }
     switch (e.code) {
       case 'KeyE': useInteractable(); break;
-      case 'KeyT': case 'KeyM': travel.openPanel(); break;
+      case 'KeyT': travel.openPanel(); break;
+      case 'KeyF': torch.setFlaring(true); break;
       case 'KeyX': hud.dismissNarration(); break;
       case 'KeyH': toggleHelp(true); break;
       case 'KeyN': {
@@ -259,13 +300,11 @@ function boot() {
   });
   document.addEventListener('mousedown', (e) => {
     if (!started || travel.open || helpOpen) return;
-    if (e.button === 0) {
-      if (!player.locked && !TEST) { player.requestLock(); return; }
-      torch.setFlaring(true);
-    }
+    if (e.button === 0 && !player.locked && !TEST) player.requestLock();
   });
-  document.addEventListener('mouseup', (e) => {
-    if (e.button === 0) torch.setFlaring(false);
+
+  document.addEventListener('keyup', (e) => {
+    if (e.code === 'KeyF') torch.setFlaring(false);
   });
 
   let helpOpen = false;
@@ -303,9 +342,13 @@ function boot() {
     const t = clock.elapsedTime;
 
     player.update(dt);
-    world.update(dt, t, player.feet);
+    world.update(dt, t, player);
     torch.update(dt, t, player);
     grade.uniforms.uTime.value = t;
+    const az = world.active;
+    hud.setMeter(az?.meter);
+    hud.setQuest(az?.quest ? az.quest() : '');
+    if (az?.fxFlash) { az.fxFlash = false; hud.pulse(); }
     advance();
 
     // interaction prompt
@@ -334,6 +377,9 @@ function boot() {
         traveling: travel.busy,
         pos: { x: player.feet.x, y: player.feet.y, z: player.feet.z },
         prompt: currentInteract?.prompt || '',
+        inventory: [...world.inventory],
+        liberatedChapters: [...world.liberated],
+        quest: world.active?.quest ? world.active.quest() : '',
       };
     },
     look: (yaw, pitch = 0) => { player.yaw = yaw; player.pitch = pitch; },

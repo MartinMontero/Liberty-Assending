@@ -33,14 +33,49 @@ Click **TAKE UP THE TORCH**, then click the world to grab the pointer.
 | --- | --- |
 | `WASD` / arrows | move · `SHIFT` run · `SPACE` jump |
 | Mouse | look (pointer lock) |
-| `E` | interact — take up the torch, touch what glimmers |
-| `LMB` (hold) | **flare the torch** — 1215 nm reveals the Ring's hidden architecture, secret writing burned into every zone |
-| `T` (or `M`) | **ask the torch to travel** — type free text like *"take me to Versailles"*, *"where the coffins are"*, *"the garden"* — or click a chapter card |
+| `E` | interact — take up the torch, speak to the Fellowship, touch what glimmers |
+| `F` (hold) | **flare the torch** — 1215 nm, wavelength of awakening: it severs tendrils, scorches peddlers, cracks coffins, codes counter-memes, and reveals the Ring's hidden writing |
+| `T` | **ask the torch to travel** — type free text like *"take me to Versailles"*, *"where the coffins are"*, *"the garden"* — or click a chapter card |
 | `X` | dismiss narration · `N` mute ambience · `H` handbook |
 
 On arrival anywhere, a title card and a narration panel describe **what surrounds you**, in the
-fable's own words.
+fable's own words — and a quest line picks up that chapter's struggle.
 
+## Play the fable, don't just walk it
+
+Every chapter is a mission built from the book's own dynamics — and the fable's thesis is the
+core mechanic: *"You can't kill an idea with fire. Only with a better idea."* The torch never
+deals damage; it **encodes counter-narratives**.
+
+1. **The Smokestack Gospel** — Robespierre's tendrils inject *cognitive dissonance* (watch the
+   meter; back off before it floods you). Modulate the torch to counter-narrative frequency —
+   hold `F` aimed at him — to **sever all six tendrils**, then thrust the torch into his open
+   jaw. From his wreck you pull the **Neural Lace Shard**. Logos, Praxis and Soma camp by the
+   road under the One Ring schematic.
+2. **The Meme Wars of Old Versailles** — stay out of the peacocks' gaze or your **Virtue
+   Score** trends and you get doxxed. Free the activist on the Guillotine™ by coding a
+   counter-meme (flare + `E`), then carry the Shard into the Hall of Mirrors and **deploy it
+   into the Civic Virtue™ servers**. The palace collapses into a .zip of cringe.
+3. **The NFT Gulag** — scorch the three peddlers with unmarketable truth, hold the flare before
+   the Crypto Kingpin to **flood his market with infinite crowns** (scarcity dies, the crown
+   falls), and burn *Liberty's first cry of "No!"* free of its auction cage.
+4. **DAO of the Dead** — deploy the **Copyleft Ouija Board** to give the dead root access, then
+   crack five coffin racks with the flare so the souls remember themselves — and last, press
+   your palm to Maria Kwan's coffin.
+5. **Quantum Carceri** — the Warden stalks you and **Bayesian Guilt** rises in its gaze; max it
+   and the what-if singularity spits you backward. Speak the Apology Algorithm *in order* —
+   Admit Harm → Reject Absolution → Act Anyway — then face it and hold both truths.
+6. **The Eternal Beta** — unplug your neural jack so the FOMO drones lose your scent, scavenge
+   the dead tech (floppy · rotary dial · cassette of her mother's voice) to power the
+   Frankenstein Server until the Beta stalls at BUFFERING…, then **lob the Memory Grenade**.
+7. **The Unseen Garden** — liberate all six chapters and plant the future to earn the true
+   ending: *the end, or the long beginning.*
+
+Each liberation is tracked (⚑ n/6), relics live in your inventory chips, and the garden knows
+whether the Ring still stands.
+
+![Severing the Reaper's tendrils](docs/screenshots/reaper-fight.png)
+![Deploying the shard in the Hall of Mirrors](docs/screenshots/hall-of-mirrors.png)
 ![Ask the torch](docs/screenshots/travel-panel.png)
 
 ## The seven chapters, replicated
@@ -64,7 +99,7 @@ fable's own words.
 ## The torch is the mechanic
 
 - It **pulses at 1215 nm** — idle, it breathes; held, it lights the world around you.
-- **Flaring it** (hold LMB) doesn't just burn brighter: it exposes the Ring's hidden
+- **Flaring it** (hold F) doesn't just burn brighter: it exposes the Ring's hidden
   architecture — debt-contract glyphs, guilt equations, ledger chains — different writing in
   every chapter, invisible until lit.
 - It is also your **navigator**: press `T` and speak a destination in plain words. A keyword

@@ -49,6 +49,25 @@ export function buildBeta(world) {
   ground(z, 240, tileTex, { normal: noiseNormalTexture({ strength: 1.2 }), normalScale: .45 });
   bounds(z, 54);
 
+  const bq = { unplugged: false, parts: 0, radio: false, destroyed: false, potFlying: 0 };
+
+  // ---- neural-jack terminal by the road ----
+  box(z, 1.2, 2.4, .7, mat(0x14201c, { metal: .6, rough: .5 }), 3, 1.2, 28, { collide: true });
+  const jackScreen = glowPanel(z, textPanel({
+    lines: ['NEURAL JACK DETECTED', 'CLOUD TETHER: ACTIVE'], w: 640, h: 220, bg: '#04130b',
+    fg: ['#7dffb0', '#ff7a6a'], font: 'bold 40px "Courier New", monospace', glow: '#7dffb0', border: '#0e3a26', scan: true,
+  }), 1.1, .8, 3, 1.8, 28.4, { intensity: 1.4 });
+  z.interact(3, 1.2, 28, 3.4,
+    () => bq.unplugged ? 'E — the dead terminal' : 'E — unplug your neural jack',
+    () => {
+      if (bq.unplugged) return 'NO CARRIER. The silence is yours.';
+      bq.unplugged = true;
+      jackScreen.material.emissiveIntensity = .3;
+      world.sfx('sever');
+      z.fxFlash = true;
+      return 'You sever your tether to the cloud. “You’re right,” Liberty tells the Beta. “We’re human.” The FOMO drones overhead lose your scent — their fake victories rain on no one.';
+    });
+
   // ---- the Monolith ----
   const codeTex = codeTexture();
   const mono = new THREE.Mesh(new THREE.BoxGeometry(9, 28, 4), new THREE.MeshStandardMaterial({
@@ -74,6 +93,7 @@ export function buildBeta(world) {
   });
   glowPanel(z, verTex, 12, 1.1, 0, 31, -38, { intensity: 1.6, double: true });
   z.onUpdate((dt, t) => {
+    if (bq.radio) { barFill.scale.x = .25; barFill.position.x = -4.2; return; } // BUFFERING…
     const k = (t * .06) % 1;                         // fills…
     const w = .2 + (k < .82 ? k : .82 - (k - .82) * 4) * 8; // …then snaps back: never done
     barFill.scale.x = Math.max(.2, w);
@@ -142,6 +162,7 @@ export function buildBeta(world) {
       const a = t * sp + ph;
       dr.position.set(Math.cos(a) * ra, 7.5 + Math.sin(t * .9 + i) * 1.2, -8 + Math.sin(a) * ra);
       dr.rotation.y = -a + Math.PI / 2;
+      if (bq.unplugged) screen.material.emissiveIntensity = Math.max(.2, screen.material.emissiveIntensity - dt * .8);
     });
   }
   z.interact(0, 1.5, 2, 6, 'E — under the FOMO rain', () => {
@@ -204,17 +225,59 @@ export function buildBeta(world) {
     rings.push({ ring, phase: i / 3 });
   }
   z.onUpdate((dt, t) => {
-    beacon.material.emissiveIntensity = 1.8 + Math.sin(t * 6) * .8;
+    const boost = bq.radio ? 1.9 : 1;
+    beacon.material.emissiveIntensity = (1.8 + Math.sin(t * 6) * .8) * boost;
     for (const r of rings) {
-      const k = (t * .35 + r.phase) % 1;
-      r.ring.scale.setScalar(.4 + k * 5);
-      r.ring.material.opacity = .5 * (1 - k);
+      const k = (t * (bq.radio ? .6 : .35) + r.phase) % 1;
+      r.ring.scale.setScalar((.4 + k * 5) * boost);
+      r.ring.material.opacity = .5 * (1 - k) * (bq.radio ? 1.2 : 1);
     }
   });
   glowPanel(z, textPanel({
     lines: ['LIBRARY OF DEAD TECH', '★ RESIST AT 33 RPM ★'], w: 1024, h: 220, bg: '#140e08',
     fg: ['#ffd9a0', '#ff8f6b'], font: 'bold 52px Georgia, serif', glow: '#ffd9a0', border: '#3a2c1a',
   }), 9, 2, -27, 4.6, 13.4, { rotY: .8, intensity: 1.4 });
+
+  // ---- scavenge the unrenderable: three relics for the Frankenstein Server ----
+  const relics = [
+    { id: 'floppy', label: 'FLOPPY OF LABOR HISTORY', x: -33, zz: 12, color: 0x4466cc,
+      build: (g) => { const m = new THREE.Mesh(new THREE.BoxGeometry(.5, .06, .5), mat(0x2a3a6a, { rough: .6 })); m.position.y = .35; g.add(m); } },
+    { id: 'dial', label: 'ROTARY DIAL', x: 9, zz: 12.6, color: 0xccaa44,
+      build: (g) => { const m = new THREE.Mesh(new THREE.TorusGeometry(.22, .07, 8, 18), mat(0x8a7a4a, { metal: .7, rough: .4 })); m.rotation.x = Math.PI / 2; m.position.y = .35; g.add(m); } },
+    { id: 'cassette', label: 'CASSETTE — HER VOICE', x: 5, zz: -31, color: 0xcc6655,
+      build: (g) => { const m = new THREE.Mesh(new THREE.BoxGeometry(.44, .08, .3), mat(0x6a3a32, { rough: .6 })); m.position.y = .35; g.add(m); } },
+  ];
+  for (const r of relics) {
+    const g = new THREE.Group();
+    r.build(g);
+    const halo = new THREE.Mesh(new THREE.TorusGeometry(.4, .03, 6, 22), emat(r.color, 1.6));
+    halo.rotation.x = Math.PI / 2;
+    halo.position.y = .12;
+    g.add(halo);
+    g.position.set(r.x, 0, r.zz);
+    z.add(g);
+    r.group = g;
+    z.onUpdate((dt, t) => {
+      if (r.taken) return;
+      g.position.y = Math.sin(t * 1.6 + r.x) * .08;
+      g.rotation.y = t * .8;
+    });
+    z.interact(r.x, .6, r.zz, 2.8,
+      () => `E — salvage the ${r.label.toLowerCase()}`,
+      () => {
+        if (r.taken) return null;
+        r.taken = true;
+        g.visible = false;
+        bq.parts++;
+        world.grant(r.id, r.label);
+        if (bq.parts === 3) {
+          bq.radio = true;
+          world.sfx('dialup');
+          world.notify('The Frankenstein Server ROARS — static-laced labor history floods the pirate band. The Eternal Beta chokes on analog noise: BUFFERING…', 7);
+        }
+        return null;
+      });
+  }
   z.interact(-27, 1.5, 17, 6, 'E — the Frankenstein Server', () => {
     return 'Floppy disks, ham radios, mimeograph machines — soldered into a Frankenstein Server broadcasting static-laced labor history on pirate radio. The Beta’s algorithms choke on the analog noise.';
   });
@@ -228,9 +291,40 @@ export function buildBeta(world) {
   const cork = new THREE.Mesh(new THREE.CylinderGeometry(.13, .16, .2, 8), mat(0xc9b98a, { rough: .9 }));
   cork.position.set(16, 1.95, 22);
   z.add(cork);
-  z.interact(16, 1.2, 22, 3.5, 'E — the Memory Grenade', () => {
-    return 'A clay pot stuffed with handwritten letters in extinct languages, Polaroids of dead revolutions, and a cassette of her mother’s voice. The unencryptable. The unoptimized. The obsolete — and therefore unstoppable.';
+  z.interact(16, 1.2, 22, 3.5,
+    () => bq.destroyed ? 'E — where the pot stood' : (bq.radio ? 'E — LOB THE MEMORY GRENADE' : 'E — the Memory Grenade'),
+    () => {
+      if (bq.destroyed) return 'Shards of clay. Somewhere, a dial-up tone is still ringing.';
+      if (!bq.radio) return 'A clay pot stuffed with handwritten letters in extinct languages, Polaroids of dead revolutions, a cassette of her mother’s voice. It needs a carrier wave — feed the Frankenstein Server its dead tech first.';
+      bq.potFlying = 0.0001;
+      cork.visible = false;
+      return 'You hurl the unencryptable, the unoptimized, the OBSOLETE—';
+    });
+  z.onUpdate((dt, t) => {
+    if (!bq.potFlying || bq.destroyed) return;
+    bq.potFlying = Math.min(1, bq.potFlying + dt * .8);
+    const k = bq.potFlying;
+    pot.position.x = 16 + (0 - 16) * k;
+    pot.position.z = 22 + (-37 - 22) * k;
+    pot.position.y = 1.4 + Math.sin(k * Math.PI) * 12;
+    pot.rotation.x = k * 9;
+    if (k >= 1) {
+      bq.destroyed = true;
+      pot.visible = false;
+      z.fxFlash = true;
+      world.sfx('dialup');
+      mono.material.emissiveIntensity = .25;
+      monoLight.intensity = .6;
+      world.liberate('beta', 'THE ETERNAL BETA');
+      world.notify('The logic gates drown in the unoptimized. The monolith crumbles into a dial-up tone — 410 GONE. Liberty kneels and plants acorns in the cracks.', 8);
+    }
   });
+  z.quest = () => {
+    if (!bq.unplugged) return 'Unplug your neural jack — the terminal by the road (E)';
+    if (bq.parts < 3) return `Scavenge dead tech for the Frankenstein Server (${bq.parts}/3): floppy · dial · cassette`;
+    if (!bq.destroyed) return 'Lob the Memory Grenade at the Monolith (E at the clay pot)';
+    return '⚑ Liberated — one place remains: the garden (press T)';
+  };
 
   // first acorns in the cracks (foreshadowing the garden)
   for (let i = 0; i < 3; i++) {

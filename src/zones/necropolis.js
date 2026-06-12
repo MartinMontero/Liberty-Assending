@@ -56,6 +56,8 @@ export function buildNecropolis(world) {
     'GRIEF FUTURES — Q3 BUNDLE', 'DECEASED CREATOR — ROYALTIES 4EVER', 'WAR MEMORY — FRACTIONALIZED',
   ];
   const souls = [];
+  const coffinEdges = [];
+  const rackUnits = [];
   const rackDefs = [];
   for (let row = 0; row < 2; row++) {
     for (let col = 0; col < 4; col++) {
@@ -63,6 +65,8 @@ export function buildNecropolis(world) {
     }
   }
   rackDefs.forEach((rd, ri) => {
+    const rackUnit = { x: rd.x, z: rd.zz, souls: [], freed: false };
+    rackUnits.push(rackUnit);
     const rack = new THREE.Group();
     rack.position.set(rd.x, 0, rd.zz);
     rack.rotation.y = rd.rotY;
@@ -88,6 +92,7 @@ export function buildNecropolis(world) {
       }));
       edge.position.y = y;
       rack.add(edge);
+      coffinEdges.push(edge);
       // soul inside
       const soul = new THREE.Sprite(new THREE.SpriteMaterial({
         map: soulTex, color: 0x9fc8ff, transparent: true, opacity: .8,
@@ -96,7 +101,9 @@ export function buildNecropolis(world) {
       soul.scale.setScalar(.9);
       soul.position.set((Math.random() - .5) * 1.4, y, 0);
       rack.add(soul);
-      souls.push({ soul, phase: Math.random() * 9, baseY: y });
+      const soulRec = { soul, phase: Math.random() * 9, baseY: y, freed: false };
+      souls.push(soulRec);
+      rackUnit.souls.push(soulRec);
     }
     // epitaph plaque
     const ep = epitaphs[ri % epitaphs.length];
@@ -107,10 +114,30 @@ export function buildNecropolis(world) {
     z.add(rack);
     z.collide(rd.x - 1.6, rd.x + 1.6, rd.zz - 1, rd.zz + 1, 7.4);
   });
-  z.onUpdate((dt, t) => {
+  const nq = { root: false, freedRacks: 0, maria: false };
+  z.onUpdate((dt, t, player) => {
     for (const s of souls) {
+      if (s.freed) {
+        s.soul.position.y += dt * 2.6;
+        s.soul.material.opacity = Math.max(0, s.soul.material.opacity - dt * .4);
+        continue;
+      }
       s.soul.material.opacity = .5 + .35 * Math.sin(t * 1.6 + s.phase);
       s.soul.position.y = s.baseY + Math.sin(t * .9 + s.phase) * .18;
+    }
+    // crack the coffins: flare beside a rack once the dead have root access
+    if (nq.root && world.flare > .55) {
+      for (const ru of rackUnits) {
+        if (ru.freed) continue;
+        if (Math.hypot(player.x - ru.x, player.z - ru.z) < 6.5) {
+          ru.freed = true;
+          nq.freedRacks++;
+          for (const s of ru.souls) s.freed = true;
+          world.sfx('free');
+          z.fxFlash = true;
+          if (nq.freedRacks === 1) world.notify('The glass CRACKS. Souls pour upward, remembering themselves — unprofitable, unarchivable, free.', 5);
+        }
+      }
     }
   });
 
@@ -154,11 +181,26 @@ export function buildNecropolis(world) {
       mariaSwarm.update(dt);
     }
   });
-  z.interact(0, 1.4, -12, 4, 'E — press your palm to Maria’s coffin', () => {
-    mariaFreed = true;
-    mariaSwarm.points.visible = true;
-    return '“Mija… you can’t save me. Only remember me.” The torch encodes her unrecorded lullabies — data too human for the blockchain. “Te quiero. Now go haunt them.” Her ghost dissolves into fireflies.';
-  }, { once: true });
+  z.interact(0, 1.4, -12, 4,
+    () => nq.maria ? 'E — where Maria was' : 'E — press your palm to Maria’s coffin',
+    () => {
+      if (nq.maria) return 'Fireflies, where her fear used to be priced.';
+      if (!nq.root) return 'The DAO’s lock chews at your palm: BID TO OWN HER FEAR. Give the dead root access first — the smart-contract heart, deeper in.';
+      nq.maria = true;
+      mariaFreed = true;
+      mariaSwarm.points.visible = true;
+      world.grant('lullaby', 'MARIA’S LULLABY — too analog to tokenize');
+      return '“Mija… you can’t save me. Only remember me.” The torch encodes her unrecorded lullabies — data too human for the blockchain. “Te quiero. Now go haunt them.” Her ghost dissolves into fireflies.';
+    });
+  z.onUpdate(() => {
+    if (nq.root && nq.freedRacks >= 5 && nq.maria) world.liberate('necropolis', 'DAO OF THE DEAD');
+  });
+  z.quest = () => {
+    if (!nq.root) return 'Give the dead root access — the smart-contract heart, past the racks (E)';
+    if (nq.freedRacks < 5) return `Crack the coffins — hold F beside the racks (${nq.freedRacks}/5 racks freed)`;
+    if (!nq.maria) return 'Maria Kwan waits in the center aisle — press your palm (E)';
+    return '⚑ Liberated — the prison of probabilities remains (press T)';
+  };
 
   // ---- the DAO hydra core + manifesto ----
   const hydra = new THREE.Group();
@@ -193,18 +235,25 @@ export function buildNecropolis(world) {
     lines: ['DEATH IS A LIQUID ASSET'], w: 1536, h: 160, bg: null, fg: '#ff2433',
     font: 'bold 92px "Courier New", monospace', glow: '#ff2433',
   }), 24, 2.5, 0, 18.6, -40, { intensity: 2, double: true, cutout: true });
-  z.onUpdate((dt, t, player, playerWorld) => {
+  z.onUpdate((dt, t, player, p) => {
     for (const h of heads) {
       const a = t * .5 + h.phase;
       h.head.position.set(Math.cos(a) * 4.6, 7.5 + Math.sin(t * .8 + h.phase) * 1.6, Math.sin(a) * 4.6);
-      h.head.lookAt(playerWorld.x, 1.6, playerWorld.z);
+      h.head.lookAt(p.feet.x, 1.6, p.feet.z);
     }
     manifesto.material.emissiveIntensity = 1.6 + .7 * Math.sin(t * 2.6);
     redGlow.intensity = 2 + .8 * Math.sin(t * 2.6);
   });
-  z.interact(0, 1.5, -35, 7, 'E — the smart-contract heart', () => {
-    return 'Logos deploys a Copyleft Ouija Board, open-sourcing the necropolis. “They built this on stolen ghosts. Let’s give the dead root access.” Coffin glass cracks as souls begin remembering themselves.';
-  });
+  z.interact(0, 1.5, -35, 7,
+    () => nq.root ? 'E — the open-sourced heart' : 'E — deploy the Copyleft Ouija Board',
+    () => {
+      if (nq.root) return 'The ledger lies open. Every epitaph is forkable now.';
+      nq.root = true;
+      for (const e of coffinEdges) { e.material.color.set(0x46ff9a); e.material.opacity = .5; }
+      world.sfx('dialup');
+      z.fxFlash = true;
+      return 'Logos deploys a Copyleft Ouija Board, open-sourcing the necropolis. “They built this on stolen ghosts. Let’s give the dead ROOT ACCESS.” The coffin seals flicker green — flare the torch beside the racks to crack them.';
+    });
 
   // ---- mausoleums with neurograffiti ----
   const mausoleumDefs = [[-30, -30, .3], [30, -28, -.4], [28, 14, .8]];

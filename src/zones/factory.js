@@ -249,31 +249,104 @@ export function buildFactory(world) {
   }
   z.add(robe);
   z.collide(-2.5, 2.5, -42.5, -37.5, 1);
-  z.onUpdate((dt, t, player) => {
-    // slow menace: face the player
+
+  // ---- THE FIGHT: the torch doesn't burn him — it severs his connection ----
+  const fight = { severed: 0, jawOpen: false, defeated: false, heat: 0, lashT: 0 };
+  z.meter = { label: 'COGNITIVE DISSONANCE', color: '#ff4a3c', value: 0 };
+  z.onUpdate((dt, t, player, p) => {
     const dx = player.x - 0, dz = player.z - (-40);
-    if (Math.hypot(dx, dz) < 30) {
+    const dist = Math.hypot(dx, dz);
+    if (dist < 30 && !fight.defeated) {
       const target = Math.atan2(dx, dz);
       let d = target - robe.rotation.y;
       while (d > Math.PI) d -= Math.PI * 2;
       while (d < -Math.PI) d += Math.PI * 2;
       robe.rotation.y += d * Math.min(1, dt * 1.2);
     }
+    // tendrils sway; severed ones wither
     for (const tn of tendrils) {
+      if (tn.severed) {
+        for (const b of tn.beads) { b.scale.multiplyScalar(1 - dt * 2.4); if (b.scale.x < .08) b.visible = false; }
+        continue;
+      }
       for (let i = 0; i < tn.beads.length; i++) {
         const k = i / tn.beads.length;
+        const reach = fight.defeated ? 0 : Math.max(0, 1 - dist / 14) * .9; // they reach for you
         const sway = Math.sin(t * 2.4 + tn.phase + k * 4) * .25 * k;
         const lift = Math.sin(t * 1.7 + tn.phase * 2 + k * 3) * .2 * k;
         tn.beads[i].position.set(
-          Math.sin(tn.dir) * k * 1.6 + sway,
-          3.85 - k * 1.45 + lift,
-          Math.cos(tn.dir) * k * 1.6 + .3,
+          Math.sin(tn.dir) * k * (1.6 + reach) + sway,
+          3.85 - k * (1.45 - reach * .4) + lift,
+          Math.cos(tn.dir) * k * (1.6 + reach * 1.6) + .3,
         );
       }
     }
+    if (fight.defeated) { z.meter.value = Math.max(0, z.meter.value - dt * .3); return; }
+    // cognitive dissonance: his memetic payload, rising in his presence
+    if (dist < 13) {
+      z.meter.value = Math.min(1, z.meter.value + dt * .085);
+      fight.lashT += dt;
+      if (fight.lashT > 3.4) {            // a tendril lashes — payload spike
+        fight.lashT = 0;
+        z.meter.value = Math.min(1, z.meter.value + .14);
+        z.fxFlash = true;
+        world.sfx('dox');
+      }
+    } else {
+      z.meter.value = Math.max(0, z.meter.value - dt * .12);
+    }
+    if (z.meter.value >= 1) {             // obey and revolt, consume and destroy
+      z.meter.value = .35;
+      z.fxFlash = true;
+      world.sfx('dox');
+      world.notify('OBEY AND REVOLT · CONSUME AND DESTROY — the payload floods your nervous system. Step back. Breathe. The torch is the counter-narrative.', 6);
+    }
+    // severing: hold F aimed at him, close enough
+    if (world.flare > .55 && dist < 17 && fight.severed < 6) {
+      const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw);
+      const facing = (fx * dx / dist + fz * dz / dist) < -.72; // looking toward him
+      if (facing) {
+        fight.heat += dt;
+        if (fight.heat > .8) {
+          fight.heat = 0;
+          const tn = tendrils.find(x => !x.severed);
+          if (tn) {
+            tn.severed = true;
+            fight.severed++;
+            world.sfx('sever');
+            z.fxFlash = true;
+            if (fight.severed === 1) world.notify('“Look past his face — he’s a puppet. The Ring’s in the wires.” The beam SEVERS a tendril from the core.', 5);
+            if (fight.severed === 6) {
+              fight.jawOpen = true;
+              world.notify('His tendrils hang dead. The jaw gapes — pneumatic, hungry, OPEN.', 5);
+            }
+          }
+        }
+      }
+    }
+    if (fight.jawOpen && !fight.defeated) {
+      jaw.rotation.x = Math.min(1.5, jaw.rotation.x + dt * 1.2);
+      port.material.emissiveIntensity = 2.4 + Math.sin(t * 9) * 1.2;
+    }
   });
-  z.interact(0, 1, -38, 7.5, 'E — face the Cerebral Reaper',
-    () => '“Little miners,” Robespierre rasps, voice a corrupted .mp3 of 1793 speeches. “The Ring already rebuilt this factory in the cloud. You breathe its code. You bleed its dividends.”');
+  z.interact(0, 1, -38, 8.5,
+    () => fight.defeated ? 'E — the slumped Reaper'
+      : fight.jawOpen ? 'E — THRUST THE TORCH INTO HIS JAW'
+      : 'face the Reaper — hold F to sever his tendrils',
+    () => {
+      if (fight.defeated) return 'The last shard of his organic mind sleeps now. “All revolutions end in teeth,” the Corp-Statists whispered. Not this one.';
+      if (!fight.jawOpen) return '“Little miners,” Robespierre rasps, a corrupted .mp3 of 1793. “You breathe its code. You bleed its dividends.” — sever all six tendrils first: hold F, aimed at him.';
+      // the thrust
+      fight.defeated = true;
+      eyeMat.emissiveIntensity = .12;
+      port.material.emissiveIntensity = 0;
+      robe.rotation.x = .32;
+      z.fxFlash = true;
+      world.sfx('finale');
+      world.grant('shard', 'NEURAL LACE SHARD — it whispers: Civic Virtue™, seeding in Versailles');
+      world.liberate('factory', 'THE SMOKESTACK GOSPEL');
+      return 'The factory erupts in a supernova of decrypted data. For three seconds the Ring breaks — his human eye blinks: “Liberté…” Then the killswitch. From the wreck of his spine you pull a NEURAL LACE SHARD, whispering of the Ring’s next move.';
+    });
 
   // ---- catwalk along the right wall ----
   const walkMat = mat(0x3a3733, { metal: .6, rough: .6 });
@@ -479,6 +552,84 @@ export function buildFactory(world) {
   box(z, .4, 2.6, .4, darkMetal, -14, 1.3, 12, { collide: true });
   z.interact(-14, 1.5, 12, 4, 'E — the seeding alert',
     () => '“We don’t burn factories anymore,” Liberty said, her torch a dimming ember. “We burn stories.” — press T and ask the torch to carry you onward.');
+
+  // ---- the Fellowship of Rational Resistance, camped by the road ----
+  function figure(x, zz, rotY, coatColor, name, accentBuild) {
+    const f = new THREE.Group();
+    const coat = new THREE.Mesh(new THREE.CylinderGeometry(.32, .52, 1.5, 9), mat(coatColor, { rough: .9 }));
+    coat.position.y = 1.05;
+    f.add(coat);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(.23, 10, 8), mat(0x9a7a62, { rough: .8 }));
+    head.position.y = 2.02;
+    f.add(head);
+    accentBuild?.(f);
+    f.position.set(x, 0, zz);
+    f.rotation.y = rotY;
+    z.add(f);
+    z.collide(x - .5, x + .5, zz - .5, zz + .5, 2.1);
+    aoBlob(z, x, zz, 1.1, .5);
+    glowPanel(z, textPanel({
+      lines: [name], w: 256, h: 64, bg: null, fg: '#e8b04b', font: 'bold 38px "Courier New", monospace', glow: '#e8b04b',
+    }), 1.3, .33, x, 2.55, zz, { rotY, intensity: 1.2, double: true, cutout: true });
+    return f;
+  }
+  // Logos — systems analyst, eyes like overclocked processors
+  figure(8, 21, -2.6, 0x24303a, 'LOGOS', (f) => {
+    const tab = new THREE.Mesh(new THREE.PlaneGeometry(.42, .3), emat(0x7adcff, 1.6));
+    tab.position.set(.28, 1.35, .3);
+    tab.rotation.set(-.6, .5, 0);
+    f.add(tab);
+  });
+  z.interact(8, 1, 21, 3, 'E — Logos, at the HoloProjector',
+    () => '“It’s a dual-gateway algorithm,” Logos hisses, tracing the ouroboros. “Profit as god fused with purity as law. It doesn’t just rule — it convinces you to love your chains. Take the torch. Modulate it: hold F, and CUT him from the wires.”');
+  // Praxis — union organizer turned hacktivist (by her crowbar, at the racks)
+  figure(-21.6, -17.5, 1.9, 0x3a2430, 'PRAXIS', (f) => {
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(.07, .9, .07), mat(0x8a2b22, { metal: .8, rough: .35 }));
+    bar.position.set(-.34, 1.2, .12);
+    bar.rotation.z = .5;
+    f.add(bar);
+  });
+  // Soma — biohacker, splicing adrenal mods (near the downed drone)
+  figure(15.5, 8.5, 2.8, 0x2a3626, 'SOMA', (f) => {
+    const syr = new THREE.Mesh(new THREE.CylinderGeometry(.035, .035, .3, 6), emat(0x7dffb0, 1.4));
+    syr.position.set(.3, 1.45, .22);
+    syr.rotation.z = 1.2;
+    f.add(syr);
+  });
+  z.interact(15.5, 1, 8.5, 3, 'E — Soma, mid-splice',
+    () => 'Soma glances up from splicing adrenal mods into his veins. “Let them come. We’ll feed their patrol drones hallucinogens — watch the A.I. trip.” His grin is all teeth.');
+
+  // the One Ring schematic, etched into the smoke by the stolen HoloProjector
+  cyl(z, .5, .7, .5, darkMetal, 5, .25, 23);
+  const ringHolo = new THREE.Mesh(new THREE.TorusGeometry(1.5, .16, 10, 40), new THREE.MeshBasicMaterial({
+    color: 0x9a5cff, transparent: true, opacity: .55, blending: THREE.AdditiveBlending, depthWrite: false,
+  }));
+  ringHolo.position.set(5, 2.8, 23);
+  z.add(ringHolo);
+  const ringHolo2 = new THREE.Mesh(new THREE.TorusGeometry(1.5, .05, 8, 40), new THREE.MeshBasicMaterial({
+    color: 0xff4a6a, transparent: true, opacity: .5, blending: THREE.AdditiveBlending, depthWrite: false,
+  }));
+  ringHolo2.position.set(5, 2.8, 23);
+  z.add(ringHolo2);
+  glowPanel(z, textPanel({
+    lines: ['THE ONE RING', 'profit-as-god ⊕ purity-as-law'], w: 640, h: 170, bg: null,
+    fg: ['#b48cff', '#8a9cc0'], font: 'bold 42px "Courier New", monospace', glow: '#b48cff',
+  }), 4.4, 1.2, 5, 4.6, 23, { intensity: 1.4, double: true, cutout: true });
+  z.onUpdate((dt, t) => {
+    ringHolo.rotation.y = t * .7;
+    ringHolo.rotation.x = .4 + Math.sin(t * .5) * .2;
+    ringHolo2.rotation.y = -t * .9;
+    ringHolo2.rotation.x = .4 - Math.sin(t * .5) * .2;
+    ringHolo.material.opacity = .4 + .2 * Math.sin(t * 2.7);
+  });
+
+  // ---- chapter quest line ----
+  z.quest = () => {
+    if (!world.torchRef?.held) return 'Take up Liberty’s torch — it waits on the pedestal';
+    if (fight.defeated) return '⚑ Liberated — the shard whispers of Versailles (press T)';
+    if (fight.jawOpen) return 'His jaw hangs open — thrust the torch into it (E)';
+    return `Face Robespierre in the hall — hold F to sever his tendrils (${fight.severed}/6)`;
+  };
 
   // ---- torch pedestal (the prop itself lives in torch.js) ----
   const ped = cyl(z, .55, .7, 1.05, mat(0x2f2b27, { rough: .5, metal: .7 }), 0, .525, 14, { collide: true });

@@ -160,7 +160,7 @@ export class TorchSystem {
     this.light.intensity = 2.4;
     this.violet.intensity = 1.1;
     this.audio.sfx('pickup');
-    this.hud.toast('“She carried no weapon but a torch — wavelength of awakening.”<br><span style="font-size:13px;letter-spacing:.18em;color:#e8b04b">THE TORCH IS YOURS · HOLD LMB TO FLARE IT</span>', 7);
+    this.hud.toast('“She carried no weapon but a torch — wavelength of awakening.”<br><span style="font-size:13px;letter-spacing:.18em;color:#e8b04b">THE TORCH IS YOURS · HOLD F TO FLARE IT</span>', 7);
   }
 
   setFlaring(on) {

@@ -238,6 +238,19 @@ export function buildGarden(world) {
     planted.push({ group: g, k: 0, target: .9 + Math.random() * .9 });
   };
 
+  // the true ending: when every chapter is liberated and the future is planted
+  z.trueEnding = () => {
+    const bloom = fireflies({ box: [30, 10, 30], cx: 0, cy: 5, cz: 6, count: 160, color: [1, .85, .45], size: .17 });
+    z.add(bloom.points);
+    z.onUpdate((dt) => bloom.update(dt));
+    for (let i = 0; i < 5; i++) z.plantSapling();
+  };
+  z.quest = () => {
+    const left = 6 - world.liberated.size;
+    if (left > 0) return `${left} chapter${left === 1 ? '' : 's'} of the Ring still stand — the torch knows the way (T)`;
+    return 'Every chapter walks free. Plant the future at the story circle (E)';
+  };
+
   // golden pollen + fireflies
   const pollen = fireflies({ box: [90, 8, 90], cy: 3.5, count: 80, color: [1, .88, .55], size: .12 });
   z.add(pollen.points);

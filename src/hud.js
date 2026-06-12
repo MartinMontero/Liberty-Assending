@@ -14,6 +14,40 @@ export class HUD {
     this._toastTimer = null;
     this._titleTimer = null;
     this._narrTimer = null;
+    this.el.quest = document.getElementById('quest');
+    this.el.inv = document.getElementById('inv');
+    this.el.meterwrap = document.getElementById('meterwrap');
+    this.el.meterlabel = document.getElementById('meterlabel');
+    this.el.meterfill = document.getElementById('meterfill');
+  }
+
+  setQuest(text) {
+    const v = text || '';
+    if (this._questText === v) return;
+    this._questText = v;
+    this.el.quest.textContent = v ? '▸ ' + v : '';
+  }
+
+  setInventory(items) {
+    this.el.inv.innerHTML = items.map(i => `<span class="chip">${i}</span>`).join('');
+  }
+
+  setMeter(m) {
+    if (!m || !m.value || m.value <= 0.005) {
+      if (this._meterOn) { this.el.meterwrap.style.opacity = 0; this._meterOn = false; }
+      return;
+    }
+    this._meterOn = true;
+    this.el.meterwrap.style.opacity = 1;
+    this.el.meterlabel.textContent = m.label;
+    this.el.meterfill.style.width = Math.min(100, m.value * 100) + '%';
+    this.el.meterfill.style.background = m.color || '#ff4a3c';
+    this.el.meterwrap.style.borderColor = m.color || '#ff4a3c';
+  }
+
+  pulse() {
+    this.el.flarefx.style.opacity = .85;
+    setTimeout(() => { this.el.flarefx.style.opacity = 0; }, 180);
   }
 
   prompt(text) {

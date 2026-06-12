@@ -100,6 +100,71 @@ export function buildGulag(world) {
   z.interact(-10, 1.2, 18, 4.5, 'E — inspect the wares',
     () => '“They’ve commodified the concept of resistance,” Logos mutters. “The Ring’s final joke — turn dissent into a liquidity pool.”');
 
+  // ---- NFT peddlers in glitch-core guillotine masks — scorch them with truth ----
+  const gq = { scorched: 0, crownFallen: 0, relicFreed: false, floodHeat: 0 };
+  const peddlers = [];
+  for (const [wx, wz] of [[-10, 16], [10, 0], [-10, -16]]) {
+    const w = new THREE.Group();
+    const robeP = new THREE.Mesh(new THREE.ConeGeometry(.6, 2.1, 9), new THREE.MeshStandardMaterial({
+      color: 0x0c0a14, roughness: .6, transparent: true, opacity: .85, emissive: 0x2a1240, emissiveIntensity: .5,
+    }));
+    robeP.position.y = 1.05;
+    w.add(robeP);
+    const mask = new THREE.Mesh(new THREE.PlaneGeometry(.5, .62), new THREE.MeshStandardMaterial({
+      color: 0x000, emissive: 0xff3b6b, emissiveIntensity: 1.2, side: THREE.DoubleSide,
+    }));
+    mask.position.set(0, 1.95, .26);
+    w.add(mask);
+    w.position.set(wx + 2.2, 0, wz);
+    z.add(w);
+    peddlers.push({ w, robeP, mask, heat: 0, dead: false, x: wx + 2.2, z: wz });
+  }
+  z.onUpdate((dt, t, player, p) => {
+    for (const pd of peddlers) {
+      if (pd.dead) {
+        pd.w.scale.x = pd.w.scale.z = Math.max(.01, pd.w.scale.x - dt * 1.2);
+        pd.w.scale.y = pd.w.scale.y + dt * 2.4;
+        pd.robeP.material.opacity = Math.max(0, pd.robeP.material.opacity - dt * 1.4);
+        pd.mask.material.emissiveIntensity = Math.max(0, pd.mask.material.emissiveIntensity - dt * 2);
+        continue;
+      }
+      pd.w.rotation.y = Math.atan2(player.x - pd.x, player.z - pd.z); // they watch you hawk their wares
+      const d = Math.hypot(player.x - pd.x, player.z - pd.z);
+      if (world.flare > .55 && d < 8) {
+        pd.heat += dt;
+        pd.mask.material.emissiveIntensity = 1.2 + pd.heat * 3;
+        if (pd.heat > .7) {
+          pd.dead = true;
+          gq.scorched++;
+          world.sfx('free');
+          z.fxFlash = true;
+          if (gq.scorched === 1) world.notify('The 1215 nm beam — wavelength of unmarketable truth — scorches the peddler where he stands. He unminted.', 5);
+          if (gq.scorched === 3) world.notify('The bazaar’s sellers are smoke. Their listings 404 into the dark.', 5);
+        }
+      } else pd.heat = Math.max(0, pd.heat - dt);
+    }
+    // flooding the Kingpin's market: hold the flare before him
+    if (!gq.crownFallen && world.flare > .55 && Math.hypot(player.x, player.z + 38) < 16) {
+      gq.floodHeat += dt;
+      if (gq.floodHeat > 1.4) {
+        gq.crownFallen = 1;
+        world.sfx('sever');
+        z.fxFlash = true;
+        world.notify('“You can’t hash solidarity.” You flood the chain with INFINITE COPIES of his crown — scarcity dies, and with it, the price.', 6);
+      }
+    }
+    if (gq.crownFallen === 1) {
+      let allDown = true;
+      for (const hp of hashes) {
+        hp.position.y -= dt * 2.6;
+        if (hp.position.y > -8) allDown = false; else hp.visible = false;
+      }
+      wire.material.opacity = Math.max(.12, wire.material.opacity - dt * .3);
+      kingLight.intensity = Math.max(.7, kingLight.intensity - dt * 1.2);
+      if (allDown) gq.crownFallen = 2;
+    }
+  });
+
   // ---- the rarest lot: Liberty's first cry of 'No!' ----
   const podium = cyl(z, 1.2, 1.5, 1.4, mat(0x241c38, { metal: .5, rough: .4 }), 0, .7, -12, { collide: true, seg: 18 });
   const cage = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.2, 2.2), new THREE.MeshBasicMaterial({
@@ -120,8 +185,30 @@ export function buildGulag(world) {
     cage.rotation.y = -t * .5;
     relic.material.emissiveIntensity = 1.5 + Math.sin(t * 5) * .5;
   });
-  z.interact(0, 1.5, -12, 4.5, 'E — the auctioned memory',
-    () => '“You want my pain? My rage?” Liberty uncloaks her torch. “Here’s your exclusive drop.” The NFT disintegrates into a swarm of public-domain fireflies — and every wallet auto-donates.');
+  z.interact(0, 1.5, -12, 4.5,
+    () => gq.relicFreed ? 'E — the empty podium' : 'E — free her first “No!” (hold F while you press it)',
+    () => {
+      if (gq.relicFreed) return 'Public-domain fireflies still hum where the lot stood. Copy them. Paste them. Resurrect them.';
+      if (world.flare < .45) return 'Hedge-fund avatars raise diamond hands; the bidding soars on her stolen rage. Hold F — burn it free with the verses too radical for the history books — then press E.';
+      gq.relicFreed = true;
+      relic.visible = false;
+      cage.material.opacity = .15;
+      world.sfx('free');
+      z.fxFlash = true;
+      world.grant('marseillaise', 'THE MARSEILLAISE, FIRST DRAFT');
+      return '“You want my pain? My rage? Here’s your exclusive drop.” The NFT disintegrates into a swarm of public-domain fireflies — and every wallet in the room auto-donates to Landback.';
+    });
+  z.quest = () => {
+    if (gq.scorched < 3) return `Scorch the NFT peddlers with unmarketable truth — hold F at them (${gq.scorched}/3)`;
+    if (!gq.relicFreed) return 'Free Liberty’s first “No!” at the rarest lot — hold F + E';
+    if (gq.crownFallen < 2) return 'Stand before the Kingpin and hold F — flood his market with infinite crowns';
+    return '⚑ Liberated — the dead are still being mined (press T)';
+  };
+  z.onUpdate(() => {
+    if (gq.scorched === 3 && gq.relicFreed && gq.crownFallen === 2) {
+      world.liberate('gulag', 'THE NFT GULAG');
+    }
+  });
 
   // ---- public-domain fireflies (freed truths) ----
   const freed = fireflies({ box: [16, 5, 12], cx: 0, cy: 3.4, cz: -12, count: 50, color: [1, .9, .5], size: .14 });
@@ -159,14 +246,14 @@ export function buildGulag(world) {
   const kingLight = new THREE.PointLight(0x9a5aff, 4.5, 52, 1.7);
   kingLight.position.set(0, 10, -34);
   z.add(kingLight);
-  z.onUpdate((dt, t, player, playerWorld) => {
+  z.onUpdate((dt, t, player, p) => {
     king.rotation.y = t * .3;
     wire.rotation.y = -t * .22;
     wire.rotation.x = Math.sin(t * .4) * .3;
     const breathe = 1 + Math.sin(t * 1.1) * .06;
     core.scale.setScalar(breathe);
     crown.rotation.y = t * .8;
-    for (const hp of hashes) hp.lookAt(playerWorld.x, 14.4, playerWorld.z);
+    for (const hp of hashes) hp.lookAt(p.feet.x, 14.4, p.feet.z);
     core.material.emissiveIntensity = .75 + .35 * Math.sin(t * 2.2);
   });
   glowPanel(z, textPanel({

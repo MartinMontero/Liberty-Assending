@@ -168,10 +168,22 @@ export function buildCarceri(world) {
   const wardenLight = new THREE.PointLight(0xb08aff, 2, 22, 1.8);
   wardenLight.position.set(0, 3, -26);
   z.add(wardenLight);
-  z.onUpdate((dt, t, player, playerWorld) => {
-    // drifts slowly toward you, never quite arriving
+  z.meter = { label: 'BAYESIAN GUILT', color: '#b08aff', value: 0 };
+  z.onUpdate((dt, t, player, p) => {
     const dx = player.x - warden.position.x, dz = player.z - warden.position.z;
     const d = Math.hypot(dx, dz);
+    if (cq.wardenDown) {
+      // its certainty dissolves into human ambiguity
+      wardenLight.intensity = Math.max(0, wardenLight.intensity - dt * 1.2);
+      for (const wc of wardenCopies) {
+        wc.copy.children.forEach((ch) => {
+          if (ch.material) ch.material.opacity = Math.max(0, (ch.material.opacity ?? 1) - dt * .25);
+          if (ch.material?.emissiveIntensity) ch.material.emissiveIntensity = Math.max(0, ch.material.emissiveIntensity - dt * 1.5);
+        });
+      }
+      z.meter.value = Math.max(0, z.meter.value - dt * .4);
+      return;
+    }
     if (d > 9 && d < 34) {
       warden.position.x += (dx / d) * dt * .55;
       warden.position.z += (dz / d) * dt * .55;
@@ -186,10 +198,34 @@ export function buildCarceri(world) {
         if (ch.material && ch.material.transparent) ch.material.opacity = .12 + .25 * Math.abs(k);
       });
     }
+    // guilt accumulates in its gaze
+    if (d < 11) z.meter.value = Math.min(1, z.meter.value + dt * .12);
+    else z.meter.value = Math.max(0, z.meter.value - dt * .05);
+    if (z.meter.value >= 1) {
+      z.meter.value = .3;
+      z.fxFlash = true;
+      world.sfx('dox');
+      // the what-if singularity spits you back
+      p.feet.z += 7;
+      world.notify('“You failed me. You’ll fail them too.” — The walls tighten into a singularity of what-if and spit you backward. Speak the Apology Algorithm, in order.', 6);
+    }
   });
-  z.interact(0, 1.5, -26, 9, 'E — face the Quantum Warden', () => {
-    return 'It wears your worst memory like a mask. “Mija… you failed me. You’ll fail them too.” — Logos screams from four timelines away: “It’s a Bayesian guilt trap! Break the probability distribution!”';
-  });
+  z.interact(0, 1.5, -26, 9,
+    () => cq.wardenDown ? 'E — the dissolving Warden' : (cq.step >= 3 ? 'E — HOLD BOTH TRUTHS' : 'E — face the Quantum Warden'),
+    () => {
+      if (cq.wardenDown) return '“Impossible,” it howls, dissolving. “You cannot hold contradictory truths.” Watch me.';
+      if (cq.step < 3) return 'It wears your worst memory like a mask. “Mija… you failed me.” — Logos screams from four timelines away: “It’s a Bayesian guilt trap! The Apology Algorithm — the three tablets, IN ORDER!”';
+      cq.wardenDown = true;
+      z.fxFlash = true;
+      world.sfx('finale');
+      world.liberate('carceri', 'QUANTUM CARCERI');
+      return 'You hold both truths at once — coward and survivor, failure and catalyst. The Warden’s binary logic short-circuits; the prison folds into a single, imperfect NOW. Praxis’s crowbar phases through six realities to silence its last threat: “Shut up. We’ll reboot harder.”';
+    });
+  z.quest = () => {
+    if (cq.step < 3) return `Speak the Apology Algorithm in order — ${['ADMIT HARM', 'REJECT ABSOLUTION', 'ACT ANYWAY'][cq.step]} (the floating tablets, E)`;
+    if (!cq.wardenDown) return 'Face the Warden and hold both truths (E)';
+    return '⚑ Liberated — the Beta updates forever (press T)';
+  };
 
   // ---- the Apology Algorithm shrine ----
   const tablets = [
@@ -197,19 +233,35 @@ export function buildCarceri(world) {
     ['REJECT ABSOLUTION', '“I don’t deserve forgiveness.”'],
     ['ACT ANYWAY', '“I’ll fight until I do.”'],
   ];
+  const cq = { step: 0, wardenDown: false };
+  const tabletMeshes = [];
   tablets.forEach(([title, sub], i) => {
     const tx = -8 + i * 8;
     const tablet = glowPanel(z, textPanel({
       lines: [title, sub], w: 640, h: 320, bg: '#120a24', fg: ['#ffd9a0', '#cbb4ff'],
       font: 'bold 52px Georgia, serif', glow: '#ffd9a0', border: '#3a2a5a',
     }), 4.4, 2.2, tx, 3, -44, { intensity: 1.3, double: true });
+    tabletMeshes.push(tablet);
     z.onUpdate((dt, t) => {
       tablet.position.y = 3 + Math.sin(t * .8 + i * 2.1) * .3;
       tablet.rotation.y = Math.sin(t * .4 + i) * .15;
     });
-  });
-  z.interact(0, 1.5, -42, 8, 'E — the Apology Algorithm', () => {
-    return 'Admit Harm. Reject Absolution. Act Anyway. The equations rupture — you are both coward and survivor, failure and catalyst. The Warden’s binary logic short-circuits.';
+    const lines = [
+      'ADMIT HARM. “I left you.” The crawlspace. The boots. You name it, and it stops naming you.',
+      'REJECT ABSOLUTION. “I don’t deserve forgiveness.” The Warden feeds on verdicts — give it none.',
+      'ACT ANYWAY. “I’ll fight until I do.” The equations rupture. You are both coward AND survivor.',
+    ];
+    z.interact(tx, 1.5, -44, 3.4,
+      () => cq.step === i ? `E — ${title}` : (cq.step > i ? `${title} — spoken` : `${title} (not yet — in order)`),
+      () => {
+        if (cq.step > i) return 'Already spoken. The words hold.';
+        if (cq.step < i) return 'The Algorithm runs in order: Admit Harm → Reject Absolution → Act Anyway.';
+        cq.step++;
+        tablet.material.emissiveIntensity = 2.6;
+        z.meter.value = Math.max(0, z.meter.value - .35);
+        world.sfx('lore');
+        return lines[i];
+      });
   });
 
   // paradox text ring

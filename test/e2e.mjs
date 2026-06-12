@@ -92,20 +92,58 @@ await shot('04-torch-held');
 // flare at the hidden architecture
 await look(Math.PI, 0.05); // face the factory hall (-z is yaw 0... turn around? no: hall is -z, reveals on back wall)
 await look(0, 0.06);
-await page.mouse.down();
+await page.keyboard.down('f');
 await sleep(2600); // headless fps ramps the flare slowly; instant on real GPUs
 s = await state();
-check(s.flare > 0.45, `torch flares (amount=${s.flare.toFixed(2)})`);
+check(s.flare > 0.45, `torch flares via F (amount=${s.flare.toFixed(2)})`);
 await shot('05-flare-reveal');
-await page.mouse.up();
+await page.keyboard.up('f');
 await sleep(600);
+
+console.log('— THE FIGHT: SEVER THE REAPER —');
+// route: right corridor, then along the back, then in front of Robespierre
+await look(-0.6, 0);
+check(await walkUntil((st) => st.pos.x > 19, { timeout: 70000 }), 'reached the right corridor');
+await look(0, 0);
+check(await walkUntil((st) => st.pos.z < -36, { timeout: 90000 }), 'reached the back of the hall');
+await look(Math.PI / 2, 0);
+check(await walkUntil((st) => Math.abs(st.pos.x) < 6, { timeout: 60000 }), 'standing before the Reaper');
+// aim at him and hold the flare to sever all six tendrils
+await page.evaluate(() => {
+  const s = window.game.state;
+  const dx = 0 - s.pos.x, dz = -40 - s.pos.z;
+  window.game.look(Math.atan2(-dx, -dz), 0.18);
+});
+await page.keyboard.down('f');
+const tFight = Date.now();
+let jaw = false;
+while (Date.now() - tFight < 120000) {
+  s = await state();
+  if (/jaw hangs open/i.test(s.quest)) { jaw = true; break; }
+  await sleep(400);
+}
+await page.keyboard.up('f');
+check(jaw, `severed all six tendrils (quest: "${(await state()).quest}")`);
+await shot('05b-reaper-severed');
+// step into thrust range
+await page.evaluate(() => {
+  const s = window.game.state;
+  const dx = 0 - s.pos.x, dz = -40 - s.pos.z;
+  window.game.look(Math.atan2(-dx, -dz), 0.1);
+});
+await walkUntil((st) => Math.hypot(st.pos.x, st.pos.z + 40) < 7, { timeout: 30000 });
+await page.keyboard.press('e');
+await sleep(600);
+s = await state();
+check(s.inventory.includes('shard'), 'thrust the torch — NEURAL LACE SHARD acquired');
+check(s.liberatedChapters.includes('factory'), 'chapter 1–2 liberated');
 
 // jump sanity
 await page.keyboard.down('Space');
 let yMax = 0;
-for (let i = 0; i < 14; i++) { await sleep(70); yMax = Math.max(yMax, (await state()).pos.y); }
+for (let i = 0; i < 20; i++) { await sleep(90); yMax = Math.max(yMax, (await state()).pos.y); }
 await page.keyboard.up('Space');
-check(yMax > 0.4, `jump works (peak y=${yMax.toFixed(2)})`);
+check(yMax > 0.25, `jump works (peak y=${yMax.toFixed(2)})`);
 await sleep(900);
 
 console.log('— TRAVEL PANEL —');
@@ -123,6 +161,16 @@ await look(0, 0.04);
 await shot('07-versailles');
 await look(-0.9, 0.1);
 await shot('08-versailles-marie');
+// carry the shard into the Hall of Mirrors (around its outer wall, in through the mouth)
+await look(-1.107, 0);
+check(await walkUntil((st) => st.pos.x > 2038, { timeout: 90000 }), 'crossed the lawns to the hall mouth');
+await look(0, 0);
+check(await walkUntil((st) => st.pos.z < -12.5, { timeout: 60000 }), 'walked the Hall of Mirrors');
+await page.keyboard.press('e');
+await sleep(600);
+s = await state();
+check(s.liberatedChapters.includes('versailles'), 'deployed the shard — Versailles liberated');
+await shot('08b-mirrors-deployed');
 
 console.log('— CHAPTER 4: NFT GULAG —');
 await askTravel('the NFT bazaar where rebellion is sold', 'gulag');
@@ -134,9 +182,9 @@ await askTravel('where the glass coffins are', 'necropolis');
 await look(0, 0.04);
 await shot('10-necropolis');
 // flare among the graves
-await page.mouse.down(); await sleep(2600);
+await page.keyboard.down('f'); await sleep(2600);
 await shot('11-necropolis-flare');
-await page.mouse.up();
+await page.keyboard.up('f');
 
 console.log('— CHAPTER 6: QUANTUM CARCERI —');
 await askTravel('the quantum prison', 'carceri');

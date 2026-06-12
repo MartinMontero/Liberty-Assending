@@ -51,6 +51,19 @@
     color: rgba(244,239,230,.62); margin-top: 3px; }
   #objective { font-size: 14.5px; color: var(--gold); margin-top: 10px; font-style: italic;
     text-shadow: 0 1px 4px #000; transition: opacity .4s; }
+  #quest { font-size: 13.5px; color: #9adcff; margin-top: 5px; font-style: italic;
+    text-shadow: 0 1px 4px #000; max-width: 360px; line-height: 1.4; }
+  #inv { margin-top: 9px; max-width: 380px; }
+  #inv .chip { display: inline-block; font-family: 'Courier New', monospace; font-size: 10px;
+    letter-spacing: .08em; color: #ffd9a0; border: 1px solid rgba(232,176,75,.45);
+    background: rgba(232,176,75,.08); padding: 2px 7px; margin: 0 5px 4px 0; }
+  #meterwrap { position: fixed; left: 50%; top: 21%; transform: translateX(-50%);
+    width: 300px; border: 1px solid #ff4a3c; background: rgba(8,8,12,.66);
+    padding: 7px 10px 8px; z-index: 11; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  #meterlabel { font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: .3em;
+    color: var(--white); text-align: center; margin-bottom: 5px; }
+  #meterbar { height: 7px; background: rgba(255,255,255,.1); }
+  #meterfill { height: 100%; width: 0%; background: #ff4a3c; transition: width .15s linear; }
 
   #hints { position: absolute; right: 26px; bottom: 24px; text-align: right;
     font-family: 'Courier New', monospace; font-size: 12.5px; line-height: 1.85;
@@ -183,10 +196,16 @@
       <div class="zname" id="zname"></div>
       <div class="zch" id="zch"></div>
       <div id="objective"></div>
+      <div id="quest"></div>
+      <div id="inv"></div>
+    </div>
+    <div id="meterwrap">
+      <div id="meterlabel"></div>
+      <div id="meterbar"><div id="meterfill"></div></div>
     </div>
     <div id="hints">
       <b>WASD</b> move &nbsp;·&nbsp; <b>SHIFT</b> run &nbsp;·&nbsp; <b>SPACE</b> jump<br>
-      <b>E</b> interact &nbsp;·&nbsp; <b>LMB</b> flare torch<br>
+      <b>E</b> interact &nbsp;·&nbsp; <b>F</b> (hold) flare torch<br>
       <b>T</b> ask the torch to travel &nbsp;·&nbsp; <b>H</b> help
     </div>
   </div>
@@ -224,7 +243,7 @@
         <tr><td>MOUSE</td><td>look — click the world to take hold of it (pointer lock)</td></tr>
         <tr><td>W A S D</td><td>move · SHIFT run · SPACE jump</td></tr>
         <tr><td>E</td><td>interact — take up the torch, touch what glimmers</td></tr>
-        <tr><td>LMB (hold)</td><td>flare the torch — 1215&nbsp;nm reveals the Ring’s hidden architecture</td></tr>
+        <tr><td>F (hold)</td><td>flare the torch — 1215&nbsp;nm severs tendrils, scorches peddlers, frees souls, and reveals the Ring’s hidden writing</td></tr>
         <tr><td>T</td><td>ask the torch to carry you to any chapter of the story</td></tr>
         <tr><td>X</td><td>dismiss narration</td></tr>
         <tr><td>N</td><td>mute / unmute ambience</td></tr>
@@ -249,7 +268,7 @@
     </div>
     <div id="begin">TAKE UP THE TORCH</div>
     <div class="ictl">
-      WASD move · MOUSE look · E interact · LMB flare the torch<br>
+      WASD move · MOUSE look · E interact · hold F to flare the torch<br>
       T — ask the torch to carry you anywhere in the story
     </div>
     <div class="iload" id="iload">FORGING THE WORLD…</div>

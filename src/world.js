@@ -91,10 +91,10 @@ export class World {
     }
   }
 
-  update(dt, t, playerFeet) {
+  update(dt, t, player) {
     if (!this.active) return;
-    const local = _tmp.copy(playerFeet).sub(this.active.origin);
-    for (const fn of this.active.updaters) fn(dt, t, local, playerFeet);
+    const local = _tmp.copy(player.feet).sub(this.active.origin);
+    for (const fn of this.active.updaters) fn(dt, t, local, player);
   }
 }
 

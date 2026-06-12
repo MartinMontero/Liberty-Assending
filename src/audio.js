@@ -187,6 +187,24 @@ export class AudioEngine {
       case 'finale':
         [262, 330, 392, 523].forEach((f, i) => tone(f, f, 1.6, 'sine', .09, i * .3));
         break;
+      case 'sever':
+        tone(2400, 220, .14, 'sawtooth', .12);
+        whoosh(.2, 2600, .14);
+        break;
+      case 'dox':
+        tone(880, 110, .5, 'square', .1);
+        tone(932, 117, .5, 'square', .08, .05);
+        break;
+      case 'free':
+        tone(523, 1046, .7, 'sine', .1);
+        tone(659, 1318, .9, 'sine', .07, .15);
+        break;
+      case 'dialup':
+        tone(1200, 1200, .18, 'sine', .09);
+        tone(1800, 1800, .18, 'sine', .09, .22);
+        tone(400, 2400, .8, 'sawtooth', .04, .45);
+        whoosh(1, 2000, .12);
+        break;
     }
   }
 }

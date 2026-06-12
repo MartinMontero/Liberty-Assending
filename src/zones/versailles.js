@@ -167,6 +167,7 @@ export function buildVersailles(world) {
     () => '“Darling proletarians!” Marie-AI-nette coos, auto-tuned to ASMR perfection. “Why revolt when you can resolve? Download Civic Virtue™ and let’s disrupt inequity — one verified virtue-point at a time!”');
 
   // ---- holographic peacocks with hashtag tails ----
+  const peacockSpots = [];
   const tags = ['#LetThemEatCrypto', '#EatTheRichChallenge', '#CivicVirtueBeta'];
   for (let i = 0; i < 3; i++) {
     const peacock = new THREE.Group();
@@ -195,6 +196,7 @@ export function buildVersailles(world) {
     tail.position.set(0, 1.5, -.4);
     peacock.add(tail);
     const px = [14, -8, 24][i], pz = [10, 16, -8][i];
+    peacockSpots.push([px, pz]);
     peacock.position.set(px, 0, pz);
     peacock.rotation.y = i * 2.1;
     z.add(peacock);
@@ -221,11 +223,44 @@ export function buildVersailles(world) {
     lines: ['GUILLOTINE™', 'tag 3 friends who “deserve” it'], w: 768, h: 220, bg: '#14081f',
     fg: ['#ff5e8a', '#d8c8ff'], font: 'bold 56px "Courier New", monospace', glow: '#ff5e8a', border: '#ff5e8a',
   }), 8, 2.3, 24, 10.6, -22, { intensity: 1.6, double: true });
+  // the teen climate activist, dragged onstage — carbon score flashing red
+  const activist = new THREE.Group();
+  const aBody = new THREE.Mesh(new THREE.CylinderGeometry(.22, .34, 1.2, 8), mat(0x3a5a4a, { rough: .9 }));
+  aBody.position.y = 1.7;
+  activist.add(aBody);
+  const aHead = new THREE.Mesh(new THREE.SphereGeometry(.2, 10, 8), mat(0x9a7a62, { rough: .8 }));
+  aHead.position.y = 2.5;
+  activist.add(aHead);
+  const scoreTag = glowPanel(z, textPanel({
+    lines: ['CARBON SCORE: ▓▓▓ RED'], w: 512, h: 64, bg: null, fg: '#ff4a3c',
+    font: 'bold 36px "Courier New", monospace', glow: '#ff4a3c',
+  }), 2.6, .33, 0, 3.1, 0, { intensity: 1.6, double: true, cutout: true });
+  activist.add(scoreTag);
+  activist.position.set(24, 1.1, -20.5);
+  z.add(activist);
+  const vq = { freed: false, deployed: false };
   z.onUpdate((dt, t) => {
-    blade.position.y = 7.4 + Math.max(0, Math.sin(t * .7)) * .5; // it never quite drops
+    if (vq.freed) {
+      blade.position.y = Math.max(2.6, blade.position.y - dt * 4);   // glitched blade drops harmlessly aside
+      blade.rotation.z = Math.min(.9, blade.rotation.z + dt * .8);
+      activist.position.y = Math.min(7, activist.position.y + dt * 1.6); // she rises, unpersoned no more
+      activist.children.forEach(c => { if (c.material && 'opacity' in c.material) { c.material.transparent = true; c.material.opacity = Math.max(0, (7 - activist.position.y) / 5); } });
+    } else {
+      blade.position.y = 7.4 + Math.max(0, Math.sin(t * .7)) * .5; // it never quite drops
+      scoreTag.material.emissiveIntensity = 1.2 + Math.max(0, Math.sin(t * 6)) * 1.2;
+    }
   });
-  z.interact(24, 1.6, -20, 6, 'E — the Guillotine™ stage',
-    () => 'A teen climate activist is dragged onstage, carbon score flashing red. Liberty’s torch lashes out, coding a counter-meme: “I’M A THREAT? GOOD.” The blade glitches — and slices the macaron pyramid instead.');
+  z.interact(24, 1.6, -20, 6.5,
+    () => vq.freed ? 'E — the silenced Guillotine™' : 'E — code a counter-meme (hold F while you press it)',
+    () => {
+      if (vq.freed) return 'The blade lies in the macarons. The crowd has already scrolled on.';
+      if (world.flare < .45) return '“Tag 3 friends who ‘deserve’ it!” Marie purrs. The activist’s carbon score flashes red. The torch must be FLARING to code a counter-meme — hold F, then press E.';
+      vq.freed = true;
+      world.sfx('sever');
+      z.fxFlash = true;
+      world.grant('countermeme', 'COUNTER-MEME — “I’M A THREAT? GOOD.”');
+      return 'Your torch lashes out, coding the counter-meme over her face: “I’M A THREAT? GOOD.” The Guillotine™ glitches — and slices through the macaron pyramid instead. The crowd goes feral for it.';
+    });
 
   // ---- Hall of Mirrors wing ----
   box(z, 2, 9, 26, cream, 36, 4.5, -13, { collide: true });
@@ -247,8 +282,33 @@ export function buildVersailles(world) {
     lines: ['HALL OF MIRRORS', 'a kaleidoscope of fractured reputations'], w: 1024, h: 200, bg: '#10141f',
     fg: ['#cfe0f4', '#8a9cc0'], font: 'bold 50px Georgia, serif', glow: '#cfe0f4',
   }), 9, 1.8, 40, 6.2, .2, { intensity: 1.2 });
-  z.interact(40, 1.6, -13, 4, 'E — the fractured mirrors',
-    () => '“You’re obsolete,” Marie spits from every shard, flickering your deleted credit score. “No platform, no power.” Liberty smiles: “You missed the update.”');
+  z.interact(40, 1.6, -13, 5,
+    () => vq.deployed ? 'E — the quiet mirrors' : 'E — deploy the Neural Lace Shard',
+    () => {
+      if (vq.deployed) return 'The mirrors reflect only you now — unscored, unranked, unsold.';
+      if (!world.has('shard')) return '“You’re obsolete,” Marie spits from every shard. “No platform, no power.” — You need Robespierre’s NEURAL LACE SHARD. It sleeps in the factory. (Press T.)';
+      vq.deployed = true;
+      world.sfx('dialup');
+      z.fxFlash = true;
+      marieCollapse();
+      world.liberate('versailles', 'THE MEME WARS OF OLD VERSAILLES');
+      return 'You unleash the shard — Robespierre’s last scream of Liberté — into the Civic Virtue™ servers. The palace collapses into a .zip file of cringe. Marie freezes mid-screech: “Do you know how many sponsors I’ll—”';
+    });
+  // the collapse, when the shard hits the servers
+  let collapsing = false;
+  function marieCollapse() {
+    collapsing = true;
+    const reviews = chatTexture();
+    chatDome.material.map = reviews;
+    chatDome.material.opacity = .25;
+    chatDome.material.needsUpdate = true;
+  }
+  z.onUpdate((dt) => {
+    if (!collapsing) return;
+    marie.position.y = Math.max(1.2, marie.position.y - dt * .8);
+    halo.scale.multiplyScalar(Math.max(0, 1 - dt * 1.4));
+    gown.material.emissiveIntensity = Math.max(0, gown.material.emissiveIntensity - dt * .4);
+  });
 
   // courtyard hedges
   for (const [hx, hz, w, d] of [[-14, 14, 10, 1.6], [14, 22, 12, 1.6], [-26, 4, 1.6, 14], [30, 6, 1.6, 12]]) {
@@ -274,6 +334,31 @@ export function buildVersailles(world) {
   aoBlob(z, -22, -12, 5.6, .42);     // macaron pyramid
   aoBlob(z, 24, -20, 6.4, .42);      // guillotine stage
   for (const [hx, hz] of [[-14, 14], [14, 22], [-26, 4], [30, 6]]) aoBlob(z, hx, hz, 5, .3);
+
+  // ---- VIRTUE SCORE: stand in the peacocks' gaze and the engine harvests you ----
+  z.meter = { label: 'VIRTUE SCORE — DO NOT TREND', color: '#ff6bd5', value: 0 };
+  z.onUpdate((dt, t, player) => {
+    let gazed = false;
+    for (const [gx, gz] of peacockSpots) {
+      if (Math.hypot(player.x - gx, player.z - gz) < 8.5) { gazed = true; break; }
+    }
+    if (gazed && !vq.deployed) z.meter.value = Math.min(1, z.meter.value + dt * .13);
+    else z.meter.value = Math.max(0, z.meter.value - dt * .06);
+    if (z.meter.value >= 1) {
+      z.meter.value = .25;
+      z.fxFlash = true;
+      world.sfx('dox');
+      world.notify('TRENDING. “Anonymity is heresy, darling!” — your cortex is doxxed and sold as engagement. Keep clear of the peacocks’ gaze.', 6);
+    }
+  });
+
+  z.quest = () => {
+    if (!vq.freed) return 'Free the activist at the Guillotine™ — hold F and press E';
+    if (!vq.deployed) return world.has('shard')
+      ? 'Carry the shard into the Hall of Mirrors — deploy it (E)'
+      : 'The mirrors demand the Neural Lace Shard — it sleeps in the factory (T)';
+    return '⚑ Liberated — the Gulag still mints (press T)';
+  };
 
   // sparkle motes drifting over the lawns
   const motes = fireflies({ box: [70, 6, 70], cy: 3.4, count: 50, color: [.6, .9, 1], size: .12 });
