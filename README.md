@@ -11,15 +11,19 @@ the story, from the Meme Wars of Old Versailles to the Unseen Garden of the epil
 
 ## Play it
 
-Any static file server works — there is **no build step**:
+**Easiest:** the hosted version on GitHub Pages — no install at all:
+**https://martinmontero.github.io/Liberty-Assending/**
+
+**Locally:** any static file server works — there is **no build step**. With
+[Node.js](https://nodejs.org) installed (Windows/Mac/Linux):
 
 ```bash
-git clone <this repo> && cd Liberty-Assending
-npm start            # python3 -m http.server 8000
-# open http://localhost:8000
+git clone https://github.com/MartinMontero/Liberty-Assending && cd Liberty-Assending
+node serve.mjs
 ```
 
-(or `npx serve .`, or GitHub Pages — everything is relative-path, fully offline, zero CDN calls.)
+then open `http://localhost:8000` in your browser. (Python users: `python -m http.server 8000`
+works too. Everything is relative-path, fully offline, zero CDN calls.)
 
 Click **TAKE UP THE TORCH**, then click the world to grab the pointer.
 
