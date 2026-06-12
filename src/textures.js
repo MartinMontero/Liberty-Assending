@@ -307,3 +307,151 @@ export function starsTexture(count = 420, tint = '#cdd8ff') {
     ctx.globalAlpha = 1;
   }, { srgb: false, repeat: [4, 2] });
 }
+
+// ---------------------------------------------------------------------------
+// Cinematic upgrade kit: normal maps, AO blobs, painted skies, flame sprites.
+// ---------------------------------------------------------------------------
+
+// Procedural bump -> tangent-space normal map (tiled).
+export function noiseNormalTexture({ blobs = 700, strength = 1.6, size = 256 } = {}) {
+  const hc = document.createElement('canvas');
+  hc.width = hc.height = size;
+  const hctx = hc.getContext('2d');
+  hctx.fillStyle = '#808080';
+  hctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < blobs; i++) {
+    const x = Math.random() * size, y = Math.random() * size, r = 2 + Math.random() * 14;
+    const up = Math.random() < .5;
+    const g = hctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, up ? 'rgba(255,255,255,.16)' : 'rgba(0,0,0,.16)');
+    g.addColorStop(1, 'rgba(128,128,128,0)');
+    hctx.fillStyle = g;
+    // draw wrapped so the tile seams disappear
+    for (const ox of [-size, 0, size]) for (const oy of [-size, 0, size]) {
+      hctx.beginPath(); hctx.arc(x + ox, y + oy, r, 0, 7); hctx.fill();
+    }
+  }
+  const h = hctx.getImageData(0, 0, size, size).data;
+  const H = (x, y) => h[(((y + size) % size) * size + ((x + size) % size)) * 4];
+  return canvasTexture(size, size, (ctx) => {
+    const out = ctx.createImageData(size, size);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const dx = (H(x + 1, y) - H(x - 1, y)) / 255 * strength;
+        const dy = (H(x, y + 1) - H(x, y - 1)) / 255 * strength;
+        const inv = 1 / Math.hypot(dx, dy, 1);
+        const i = (y * size + x) * 4;
+        out.data[i] = (-dx * inv * .5 + .5) * 255;
+        out.data[i + 1] = (-dy * inv * .5 + .5) * 255;
+        out.data[i + 2] = (inv * .5 + .5) * 255;
+        out.data[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(out, 0, 0);
+  }, { srgb: false, repeat: [8, 8] });
+}
+
+// Soft dark contact-shadow blob.
+export function aoTexture() {
+  return canvasTexture(128, 128, (ctx) => {
+    const g = ctx.createRadialGradient(64, 64, 4, 64, 64, 62);
+    g.addColorStop(0, 'rgba(0,0,0,.62)');
+    g.addColorStop(.6, 'rgba(0,0,0,.3)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 128, 128);
+  }, { srgb: false });
+}
+
+// Scorched ground decal with a ragged edge.
+export function scorchTexture() {
+  return canvasTexture(256, 256, (ctx, w, h) => {
+    for (let i = 0; i < 46; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = 38 + Math.random() * 70;
+      const x = w / 2 + Math.cos(a) * r * .45, y = h / 2 + Math.sin(a) * r * .45;
+      const g = ctx.createRadialGradient(x, y, 1, x, y, r);
+      g.addColorStop(0, 'rgba(8,5,3,.5)');
+      g.addColorStop(1, 'rgba(8,5,3,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+    }
+  }, { srgb: false });
+}
+
+// Teardrop flame sprite texture (layered hot core -> orange skirt).
+export function flameTexture() {
+  return canvasTexture(128, 256, (ctx, w, h) => {
+    const layer = (cx, cy, rx, ry, stops) => {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(rx, ry);
+      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+      for (const [p, c] of stops) g.addColorStop(p, c);
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(0, 0, 1, 0, 7); ctx.fill();
+      ctx.restore();
+    };
+    layer(w / 2, h * .66, w * .46, h * .52, [[0, 'rgba(255,120,20,.85)'], [.55, 'rgba(255,70,10,.38)'], [1, 'rgba(255,40,0,0)']]);
+    layer(w / 2, h * .7, w * .33, h * .4, [[0, 'rgba(255,190,60,.95)'], [.6, 'rgba(255,130,25,.5)'], [1, 'rgba(255,90,10,0)']]);
+    layer(w / 2, h * .76, w * .2, h * .26, [[0, 'rgba(255,250,225,1)'], [.5, 'rgba(255,225,130,.85)'], [1, 'rgba(255,170,50,0)']]);
+    layer(w / 2, h * .42, w * .17, h * .3, [[0, 'rgba(255,160,40,.5)'], [1, 'rgba(255,110,20,0)']]); // licking tip
+  }, { srgb: false });
+}
+
+// Painterly sky: gradient + soft cloud masses (optionally rim-lit from below) + stars.
+export function paintedSky({ stops, clouds = [], stars = 0, streaks = [], w = 1024, h = 512 }) {
+  return canvasTexture(w, h, (ctx) => {
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    for (const [p, c] of stops) g.addColorStop(p, c);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    if (stars > 0) {
+      for (let i = 0; i < stars; i++) {
+        ctx.fillStyle = 'rgba(225,232,255,' + (.25 + Math.random() * .6) + ')';
+        const r = .4 + Math.random() * .9;
+        ctx.beginPath(); ctx.arc(Math.random() * w, Math.random() * h * .55, r, 0, 7); ctx.fill();
+      }
+    }
+    for (const band of streaks) {
+      // long horizontal haze bands
+      for (let i = 0; i < band.count; i++) {
+        const y = h * (band.y + (Math.random() - .5) * band.spread);
+        const bw = w * (.3 + Math.random() * .6), bh = 3 + Math.random() * band.thick;
+        const x = Math.random() * w;
+        const lg = ctx.createLinearGradient(x - bw / 2, 0, x + bw / 2, 0);
+        lg.addColorStop(0, 'rgba(0,0,0,0)');
+        lg.addColorStop(.5, band.color);
+        lg.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = lg;
+        ctx.fillRect(x - bw / 2, y, bw, bh);
+      }
+    }
+    for (const cl of clouds) {
+      // each cloud mass = cluster of soft blobs, optional under-rim light
+      for (let i = 0; i < cl.count; i++) {
+        const cx = Math.random() * w;
+        const cy = h * (cl.y + (Math.random() - .5) * (cl.spread ?? .12));
+        const masses = 4 + Math.floor(Math.random() * 5);
+        const baseR = (cl.size ?? 40) * (.6 + Math.random() * .9);
+        for (let m = 0; m < masses; m++) {
+          const mx = cx + (Math.random() - .5) * baseR * 2.4;
+          const my = cy + (Math.random() - .5) * baseR * .7;
+          const r = baseR * (.4 + Math.random() * .7);
+          const gg = ctx.createRadialGradient(mx, my, 0, mx, my, r);
+          gg.addColorStop(0, cl.color);
+          gg.addColorStop(1, cl.color.replace(/[\d.]+\)$/, '0)'));
+          ctx.fillStyle = gg;
+          ctx.beginPath(); ctx.arc(mx, my, r, 0, 7); ctx.fill();
+          if (cl.rim) {
+            const rg = ctx.createRadialGradient(mx, my + r * .55, 0, mx, my + r * .55, r * .8);
+            rg.addColorStop(0, cl.rim);
+            rg.addColorStop(1, cl.rim.replace(/[\d.]+\)$/, '0)'));
+            ctx.fillStyle = rg;
+            ctx.beginPath(); ctx.arc(mx, my + r * .55, r * .8, 0, 7); ctx.fill();
+          }
+        }
+      }
+    }
+  });
+}

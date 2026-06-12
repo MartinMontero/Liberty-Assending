@@ -1,8 +1,8 @@
 // Chapter 1–2 · TeslaGigafactory_X™ — the burning factory where the story opens.
 import * as THREE from 'three';
-import { Zone, mat, emat, box, cyl, ground, bounds, sky, glowPanel, reveal } from '../world.js';
-import { textPanel, grimeTexture, rustMetalTexture, skyGradient } from '../textures.js';
-import { fire, smoke, embers } from '../particles.js';
+import { Zone, mat, emat, box, cyl, ground, bounds, sky, glowPanel, reveal, aoBlob, cable } from '../world.js';
+import { textPanel, grimeTexture, rustMetalTexture, paintedSky, noiseNormalTexture, scorchTexture } from '../textures.js';
+import { fire, smoke, embers, Particles, FlameSprite } from '../particles.js';
 
 export function buildFactory(world) {
   const z = new Zone({
@@ -20,20 +20,33 @@ export function buildFactory(world) {
   });
   world.register(z);
 
-  // ---- atmosphere ----
+  // ---- atmosphere: smoke billows rim-lit by the burning city (cover-art sky) ----
   sky(z, new THREE.MeshBasicMaterial({
-    map: skyGradient([[0, '#100a07'], [0.4, '#33200f'], [0.62, '#5c2c12'], [0.78, '#8a3c16'], [0.9, '#46200d'], [1, '#241307']]),
+    map: paintedSky({
+      stops: [[0, '#0d0806'], [0.38, '#2c1a0d'], [0.6, '#5c2c12'], [0.76, '#9a4418'], [0.88, '#4a220e'], [1, '#241307']],
+      clouds: [
+        { y: .3, count: 10, size: 64, color: 'rgba(18,11,8,.55)', rim: 'rgba(255,110,30,.18)', spread: .2 },
+        { y: .52, count: 12, size: 46, color: 'rgba(26,15,9,.5)', rim: 'rgba(255,140,40,.26)', spread: .14 },
+        { y: .7, count: 8, size: 34, color: 'rgba(40,20,10,.45)', rim: 'rgba(255,170,60,.3)', spread: .08 },
+      ],
+    }),
   }));
   const hemi = new THREE.HemisphereLight(0x8a6448, 0x1c130c, 1.05);
   z.add(hemi);
   const emberKey = new THREE.DirectionalLight(0xff8a4a, 0.35);
   emberKey.position.set(-30, 40, 20);
   z.add(emberKey);
-  ground(z, 240, grimeTexture('#221e1b', '#0d0b09', '#34302c'));
+  const groundNormal = noiseNormalTexture({ strength: 2.2 });
+  ground(z, 240, grimeTexture('#221e1b', '#0d0b09', '#34302c'), { normal: groundNormal, normalScale: .8 });
   bounds(z, 54);
 
   const rust = rustMetalTexture();
-  const wallMat = new THREE.MeshStandardMaterial({ map: rust, color: 0x9a8d80, roughness: .9, metalness: .35 });
+  const wallNormal = noiseNormalTexture({ strength: 1.4, blobs: 500 });
+  wallNormal.repeat.set(6, 3);
+  const wallMat = new THREE.MeshStandardMaterial({
+    map: rust, color: 0x9a8d80, roughness: .9, metalness: .35,
+    normalMap: wallNormal, normalScale: new THREE.Vector2(.7, .7),
+  });
   const darkMetal = mat(0x23211f, { rough: .6, metal: .6 });
   const floorMat = mat(0x1b1917, { rough: .95 });
 
@@ -293,24 +306,132 @@ export function buildFactory(world) {
     z.onUpdate((dt) => sm.update(dt));
   }
 
-  // ---- fires ----
+  // ---- fires (layered billboard flames + particles + scorch decals) ----
+  const scorchTex = scorchTexture();
   const fireSpots = [[-12, -25], [17, 3], [-26, -52]];
   for (const [fx, fz] of fireSpots) {
     const f = fire({ x: fx, z: fz, radius: 1.5, count: 110, scale: 1.5 });
     const e = embers({ x: fx, z: fz, radius: 1.4, count: 30 });
     const s = smoke({ x: fx, y: 1.5, z: fz, radius: 1.2, count: 30, scale: 1.6, tint: .13 });
     z.add(f.points); z.add(e.points); z.add(s.points);
+    const flames = [
+      new FlameSprite({ x: fx, y: 0, z: fz, w: 2.6, h: 4.4, layers: 3 }),
+      new FlameSprite({ x: fx + 1, y: 0, z: fz - .6, w: 1.5, h: 2.4, layers: 2 }),
+      new FlameSprite({ x: fx - .9, y: 0, z: fz + .7, w: 1.2, h: 2, layers: 2 }),
+    ];
+    for (const fb of flames) z.add(fb.group);
+    const scorch = new THREE.Mesh(
+      new THREE.PlaneGeometry(9, 9),
+      new THREE.MeshBasicMaterial({ map: scorchTex, transparent: true, opacity: .85, depthWrite: false }),
+    );
+    scorch.rotation.x = -Math.PI / 2;
+    scorch.position.set(fx, .03, fz);
+    z.add(scorch);
     const fl = new THREE.PointLight(0xff7726, 3.2, 26, 1.8);
     fl.position.set(fx, 2.2, fz);
     z.add(fl);
     z.onUpdate((dt, t) => {
       f.update(dt); e.update(dt); s.update(dt);
+      for (const fb of flames) fb.update(t);
       fl.intensity = 2.6 + Math.sin(t * 11 + fx) * .7 + Math.random() * .8;
     });
     // debris around fires
     box(z, 1.6, .5, 1.2, darkMetal, fx + 1.6, .25, fz + 1, { rotY: .7 });
     box(z, 1.2, .4, .9, darkMetal, fx - 1.4, .2, fz - .8, { rotY: -.4 });
   }
+
+  // ---- swinging work lamps over the assembly line ----
+  const lamps = [];
+  for (let i = 0; i < 3; i++) {
+    const lx = -11 + i * 11, lz = -30;
+    const pivotL = new THREE.Group();
+    pivotL.position.set(lx, 13.4, lz);
+    const wire = new THREE.Mesh(new THREE.CylinderGeometry(.02, .02, 5.6, 5), mat(0x141312, { rough: .8 }));
+    wire.position.y = -2.8;
+    pivotL.add(wire);
+    const shade = new THREE.Mesh(new THREE.ConeGeometry(.55, .6, 10, 1, true), mat(0x2c2a26, { metal: .7, rough: .4, extra: { side: THREE.DoubleSide } }));
+    shade.position.y = -5.7;
+    pivotL.add(shade);
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(.13, 8, 6), emat(0xffd9a0, 2.2));
+    bulb.position.y = -5.9;
+    pivotL.add(bulb);
+    const lampLight = new THREE.PointLight(0xffc070, 1.5, 17, 1.9);
+    lampLight.position.y = -6.1;
+    pivotL.add(lampLight);
+    z.add(pivotL);
+    lamps.push({ pivotL, phase: i * 2.4 });
+  }
+  z.onUpdate((dt, t) => {
+    for (const L of lamps) {
+      L.pivotL.rotation.z = Math.sin(t * .7 + L.phase) * .08;
+      L.pivotL.rotation.x = Math.cos(t * .55 + L.phase) * .06;
+    }
+  });
+
+  // ---- power cables sagging through the hall + conduit pipes ----
+  cable(z, -25.5, 11, -14, -12, 13.5, -14, 2.2);
+  cable(z, -12, 13.5, -14, 12, 13.5, -16, 2.6);
+  cable(z, 12, 13.5, -16, 25.5, 11, -20, 2);
+  cable(z, -25.5, 10, -34, 0, 12.5, -36, 2.8);
+  cable(z, 0, 12.5, -36, 25.5, 10.5, -32, 2.4);
+  cable(z, -12, 13.5, -24, -12.6, 1.2, -30, .4, .03); // dangling feed to the line
+  const pipeMat = mat(0x3c3833, { metal: .7, rough: .45 });
+  for (const py of [3.1, 4]) {
+    const pipe = new THREE.Mesh(new THREE.CylinderGeometry(.16, .16, 38, 8), pipeMat);
+    pipe.rotation.x = Math.PI / 2;
+    pipe.position.set(-25.2, py, -28);
+    z.add(pipe);
+  }
+  for (let i = 0; i < 3; i++) {
+    const drop = new THREE.Mesh(new THREE.CylinderGeometry(.13, .13, 3.1, 8), pipeMat);
+    drop.position.set(-25.2, 1.55, -16 - i * 10);
+    z.add(drop);
+    z.add(new THREE.Mesh(new THREE.SphereGeometry(.2, 8, 6), pipeMat)).position.set(-25.2, 3.1, -16 - i * 10);
+  }
+
+  // ---- drifting ash + welding sparks off the robot arms ----
+  const ash = new Particles({
+    count: 90,
+    additive: false,
+    flutter: .6,
+    spawn: (p) => {
+      p.x = (Math.random() - .5) * 100; p.z = (Math.random() - .5) * 100;
+      p.y = 1 + Math.random() * 12;
+      p.vy = -.22 - Math.random() * .2; p.vx = .25;
+      p.life = 6 + Math.random() * 6;
+      p.size = .05 + Math.random() * .06;
+      const g = .28 + Math.random() * .2;
+      p.r = g; p.g = g * .92; p.b = g * .82;
+    },
+  });
+  z.add(ash.points);
+  const sparks = new Particles({
+    count: 36,
+    gravity: -7,
+    spawn: (p) => {
+      const arm = Math.floor(Math.random() * 4);
+      p.x = -14 + arm * 9 + (Math.random() - .5); p.y = 4.4 + Math.random(); p.z = -33 + Math.random();
+      const a = Math.random() * Math.PI * 2;
+      p.vx = Math.cos(a) * (1 + Math.random() * 2.4); p.vz = Math.sin(a) * (1 + Math.random() * 2.4);
+      p.vy = 1 + Math.random() * 2.6;
+      p.life = .3 + Math.random() * .5;
+      p.size = .035 + Math.random() * .04;
+      p.r = 1; p.g = .85; p.b = .5;
+    },
+  });
+  z.add(sparks.points);
+  z.onUpdate((dt) => { ash.update(dt); sparks.update(dt); });
+
+  // ---- contact shadows ----
+  aoBlob(z, 0, 14, 1.5, .6);                      // torch pedestal
+  aoBlob(z, 0, -40, 4.4, .6);                     // Robespierre dais
+  aoBlob(z, 14, -22, 1.8, .5);                    // hologram projector
+  aoBlob(z, 18, 6, 2.2, .55);                     // crashed drone
+  aoBlob(z, -17, 20, 2.4, .45);                   // billboard posts
+  aoBlob(z, -14, 12, 1.4, .45);                   // civic-virtue sign
+  for (let i = 0; i < 5; i++) aoBlob(z, -23.4, -14 - i * 4, 1.6, .5);   // racks
+  for (let i = 0; i < 3; i++) aoBlob(z, -10 + i * 10, -30, 3.4, .5);    // husks on the line
+  for (const s of stackDefs) aoBlob(z, s.x, s.z, 4.4, .6);              // smokestacks
 
   // ---- crashed patrol drone (blinking optic) ----
   const drone = new THREE.Group();

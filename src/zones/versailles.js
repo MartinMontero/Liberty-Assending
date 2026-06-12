@@ -1,7 +1,7 @@
 // Chapter 3 · The Meme Wars of Old Versailles — a metaverse palace under a Twitch sky.
 import * as THREE from 'three';
-import { Zone, mat, emat, box, cyl, ground, bounds, sky, glowPanel, reveal, glowSprite } from '../world.js';
-import { textPanel, glitchGrassTexture, palaceWallTexture, chatTexture, glowTexture, mirrorShardTexture, skyGradient } from '../textures.js';
+import { Zone, mat, emat, box, cyl, ground, bounds, sky, glowPanel, reveal, glowSprite, aoBlob } from '../world.js';
+import { textPanel, glitchGrassTexture, palaceWallTexture, chatTexture, glowTexture, mirrorShardTexture, paintedSky, noiseNormalTexture } from '../textures.js';
 import { Particles, fireflies } from '../particles.js';
 
 export function buildVersailles(world) {
@@ -22,7 +22,13 @@ export function buildVersailles(world) {
 
   // ---- Twitch-stream sky: bright VR day + scrolling chat constellation overlay ----
   sky(z, new THREE.MeshBasicMaterial({
-    map: skyGradient([[0, '#3a7ec8'], [0.45, '#7ab8e0'], [0.75, '#c8e8f4'], [1, '#9ad0e8']]),
+    map: paintedSky({
+      stops: [[0, '#3a7ec8'], [0.45, '#7ab8e0'], [0.75, '#c8e8f4'], [1, '#9ad0e8']],
+      clouds: [
+        { y: .3, count: 8, size: 40, color: 'rgba(255,255,255,.55)', spread: .12 },
+        { y: .5, count: 7, size: 26, color: 'rgba(255,250,240,.45)', spread: .08 },
+      ],
+    }),
   }));
   const chatTex = chatTexture();
   chatTex.repeat.set(6, 3);
@@ -37,7 +43,7 @@ export function buildVersailles(world) {
   sun.position.set(30, 50, 20);
   z.add(sun);
 
-  ground(z, 240, glitchGrassTexture());
+  ground(z, 240, glitchGrassTexture(), { normal: noiseNormalTexture({ strength: 1.1 }), normalScale: .4 });
   bounds(z, 54);
 
   const gold = mat(0xd4a43c, { metal: .85, rough: .3 });
@@ -248,6 +254,26 @@ export function buildVersailles(world) {
   for (const [hx, hz, w, d] of [[-14, 14, 10, 1.6], [14, 22, 12, 1.6], [-26, 4, 1.6, 14], [30, 6, 1.6, 12]]) {
     box(z, w, 1.6, d, mat(0x2e5a2e, { rough: 1 }), hx, .8, hz, { collide: true });
   }
+
+  // manicured topiary lining the approach to the fountain
+  for (const sx of [-3.6, 3.6]) {
+    for (let i = 0; i < 4; i++) {
+      const tz = 10 + i * 7;
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(.5, .62, .7, 10), mat(0xd8cfae, { rough: .7 }));
+      pot.position.set(sx, .35, tz);
+      z.add(pot);
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(.7, 2.2, 10), mat(0x2a5e2a, { rough: 1 }));
+      cone.position.set(sx, 1.9, tz);
+      cone.castShadow = true;
+      z.add(cone);
+      aoBlob(z, sx, tz, 1.2, .4);
+    }
+  }
+  // contact shadows under the set pieces
+  aoBlob(z, 0, 0, 7.4, .4);          // fountain
+  aoBlob(z, -22, -12, 5.6, .42);     // macaron pyramid
+  aoBlob(z, 24, -20, 6.4, .42);      // guillotine stage
+  for (const [hx, hz] of [[-14, 14], [14, 22], [-26, 4], [30, 6]]) aoBlob(z, hx, hz, 5, .3);
 
   // sparkle motes drifting over the lawns
   const motes = fireflies({ box: [70, 6, 70], cy: 3.4, count: 50, color: [.6, .9, 1], size: .12 });

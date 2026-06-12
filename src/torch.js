@@ -2,7 +2,7 @@
 // World prop on a pedestal; once taken, a wielded view-model with flame,
 // light, and a flare that reveals the Ring's hidden architecture.
 import * as THREE from 'three';
-import { Particles } from './particles.js';
+import { Particles, FlameSprite } from './particles.js';
 import { glowTexture } from './textures.js';
 import { emat, mat } from './world.js';
 
@@ -95,6 +95,8 @@ export class TorchSystem {
     this.prop.group.position.set(0, 1.06, 14);   // pedestal top — factory local == world (origin 0)
     this.prop.group.rotation.z = 0.06;
     scene.add(this.prop.group);
+    this.propFlame = new FlameSprite({ y: .52, w: .34, h: .62, layers: 2 });
+    this.prop.group.add(this.propFlame.group);
     this.propGlowLight = new THREE.PointLight(0xffb060, 2.2, 9, 2);
     this.propGlowLight.position.set(0, 1.9, 14);
     scene.add(this.propGlowLight);
@@ -111,6 +113,8 @@ export class TorchSystem {
     this.basePos = new THREE.Vector3(0.27, -0.31, -0.52);
     this.view.group.position.copy(this.basePos);
     this.view.group.rotation.set(0.12, 0, -0.1);
+    this.viewFlame = new FlameSprite({ y: .5, w: .22, h: .42, layers: 2, opacity: .9 });
+    this.view.group.add(this.viewFlame.group);
     camera.add(this.view.group);
 
     // carried light (world-space so it lights everything around the player)
@@ -174,6 +178,7 @@ export class TorchSystem {
       this.prop.ledMat.emissiveIntensity = 1.6 + pulse * 1.6;
       this.propGlowLight.intensity = 1.6 + pulse * 1.3;
       this.prop.group.rotation.y = t * 0.5;
+      this.propFlame.update(t);
       return;
     }
 
@@ -206,9 +211,11 @@ export class TorchSystem {
     this.view.glow1.getWorldPosition(this._wv);
     this.light.position.copy(this._wv);
     this.violet.position.copy(this._wv);
-    this.light.intensity = 2.4 + pulse * .9 + f * 7.5;
-    this.light.distance = 20 + f * 16;
+    this.light.intensity = 3.1 + pulse * .9 + f * 7.5;
+    this.light.distance = 22 + f * 16;
     this.violet.intensity = 1.0 + f * 4.2;
     this.flame.update(dt);
+    this.viewFlame.update(t);
+    this.viewFlame.group.scale.setScalar(1 + f * .6);
   }
 }

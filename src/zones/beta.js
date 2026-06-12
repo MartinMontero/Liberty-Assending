@@ -1,7 +1,7 @@
 // Chapter 7 · The Eternal Beta — perpetual obsolescence, and the analog resistance.
 import * as THREE from 'three';
-import { Zone, mat, emat, box, cyl, ground, bounds, sky, glowPanel, reveal } from '../world.js';
-import { textPanel, canvasTexture, codeTexture, skyGradient } from '../textures.js';
+import { Zone, mat, emat, box, cyl, ground, bounds, sky, glowPanel, reveal, aoBlob } from '../world.js';
+import { textPanel, canvasTexture, codeTexture, paintedSky, noiseNormalTexture } from '../textures.js';
 import { Particles } from '../particles.js';
 
 export function buildBeta(world) {
@@ -21,7 +21,14 @@ export function buildBeta(world) {
   world.register(z);
 
   sky(z, new THREE.MeshBasicMaterial({
-    map: skyGradient([[0, '#020806'], [0.55, '#07211a'], [0.85, '#0a3a2c'], [1, '#031008']]),
+    map: paintedSky({
+      stops: [[0, '#020806'], [0.55, '#07211a'], [0.85, '#0a3a2c'], [1, '#031008']],
+      streaks: [
+        { y: .42, count: 14, spread: .3, thick: 5, color: 'rgba(70,255,154,.1)' },
+        { y: .62, count: 10, spread: .2, thick: 8, color: 'rgba(40,200,160,.12)' },
+      ],
+      clouds: [{ y: .3, count: 6, size: 44, color: 'rgba(10,40,30,.5)', spread: .16 }],
+    }),
   }));
   const hemi = new THREE.HemisphereLight(0x4a9a78, 0x081209, 0.9);
   z.add(hemi);
@@ -39,7 +46,7 @@ export function buildBeta(world) {
       ctx.fillRect(Math.random() * w, Math.random() * h, 3, 3);
     }
   }, { repeat: [12, 12] });
-  ground(z, 240, tileTex);
+  ground(z, 240, tileTex, { normal: noiseNormalTexture({ strength: 1.2 }), normalScale: .45 });
   bounds(z, 54);
 
   // ---- the Monolith ----
@@ -253,6 +260,15 @@ export function buildBeta(world) {
   });
   z.add(glyphs.points);
   z.onUpdate((dt) => glyphs.update(dt));
+
+  // contact shadows
+  aoBlob(z, 0, -38, 7.5, .5);     // monolith
+  aoBlob(z, -26, -14, 2.6, .45);  // billboard 1
+  aoBlob(z, 26, -10, 2.6, .45);   // billboard 2
+  for (let r = 0; r < 3; r++) for (let i = 0; i < 5; i++) aoBlob(z, -18 + i * 9, 8 + r * 8, 1.9, .45);
+  aoBlob(z, -30, 18, 5.4, .42);   // library
+  aoBlob(z, -22, 26, 3.2, .45);   // frankenstein server
+  aoBlob(z, 16, 22, 1.5, .45);    // memory grenade
 
   // ---- reveals ----
   reveal(z, { lines: ['CANCEL ANYTIME', '(YOU WON’T)'], w: 12, h: 4.4, x: 0, y: 8, z: -35.7, color: '#7dffb0' });

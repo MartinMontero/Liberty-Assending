@@ -4,6 +4,52 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+
+// Film-look color grade: per-zone tint/saturation/contrast + vignette + grain.
+const GradeShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    uTime: { value: 0 },
+    uTint: { value: null },     // THREE.Vector3
+    uSat: { value: 1.05 },
+    uCon: { value: 1.06 },
+    uBright: { value: 1.0 },
+    uVig: { value: .28 },
+    uGrain: { value: .04 },
+  },
+  vertexShader: /* glsl */`
+    varying vec2 vUv;
+    void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: /* glsl */`
+    uniform sampler2D tDiffuse;
+    uniform float uTime, uSat, uCon, uBright, uVig, uGrain;
+    uniform vec3 uTint;
+    varying vec2 vUv;
+    float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    void main(){
+      vec3 c = texture2D(tDiffuse, vUv).rgb;
+      c *= uTint * uBright;
+      float l = dot(c, vec3(.299, .587, .114));
+      c = mix(vec3(l), c, uSat);                       // saturation
+      c = (c - .5) * uCon + .5;                        // contrast
+      vec2 q = vUv - .5;
+      c *= 1.0 - uVig * smoothstep(.12, .85, dot(q, q) * 2.6);  // vignette
+      c += (hash(vUv * 977.0 + fract(uTime) * 61.0) - .5) * uGrain; // grain
+      gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+    }`,
+};
+
+// Per-zone cinematography: tint / sat / contrast / vignette / grain / exposure.
+const GRADES = {
+  factory:    { tint: [1.06, .96, .86], sat: 1.06, con: 1.1,  vig: .34, grain: .045, exp: 1.18 },
+  versailles: { tint: [.99, 1.0, 1.05], sat: 1.16, con: 1.05, vig: .18, grain: .022, exp: 1.06 },
+  gulag:      { tint: [1.02, .93, 1.1], sat: 1.22, con: 1.12, vig: .34, grain: .04,  exp: 1.16 },
+  necropolis: { tint: [.9, .98, 1.14],  sat: .96,  con: 1.12, vig: .38, grain: .05,  exp: 1.12 },
+  carceri:    { tint: [1.03, .94, 1.12], sat: 1.18, con: 1.14, vig: .32, grain: .042, exp: 1.1 },
+  beta:       { tint: [.92, 1.06, 1.0], sat: 1.1,  con: 1.12, vig: .32, grain: .05,  exp: 1.1 },
+  garden:     { tint: [1.07, 1.0, .9],  sat: 1.14, con: 1.04, vig: .16, grain: .018, exp: 1.06 },
+};
 
 import { World } from './world.js';
 import { Player } from './player.js';
@@ -56,6 +102,20 @@ function boot() {
   const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.55, 0.55, 0.82);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
+  const grade = new ShaderPass(GradeShader);
+  grade.uniforms.uTint.value = new THREE.Vector3(1, 1, 1);
+  composer.addPass(grade);
+
+  function applyGrade(zoneId) {
+    const g = GRADES[zoneId];
+    if (!g) return;
+    grade.uniforms.uTint.value.set(...g.tint);
+    grade.uniforms.uSat.value = g.sat;
+    grade.uniforms.uCon.value = g.con;
+    grade.uniforms.uVig.value = g.vig;
+    grade.uniforms.uGrain.value = g.grain;
+    renderer.toneMappingExposure = g.exp;
+  }
 
   addEventListener('resize', () => {
     camera.aspect = innerWidth / innerHeight;
@@ -108,11 +168,13 @@ function boot() {
 
   const travel = new TravelSystem(world, player, hud, audio, (zone) => {
     audio.setZoneAmbience(AMBIENCE[zone.id]);
+    applyGrade(zone.id);
     advance();
   });
 
   // ---------- start in the factory ----------
   const startZone = world.setActive('factory');
+  applyGrade('factory');
   const s = startZone.worldSpawn();
   player.teleport(s.x, s.y, s.z, s.yaw);
   player.setColliders(startZone.colliders);
@@ -243,6 +305,7 @@ function boot() {
     player.update(dt);
     world.update(dt, t, player.feet);
     torch.update(dt, t, player);
+    grade.uniforms.uTime.value = t;
     advance();
 
     // interaction prompt

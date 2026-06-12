@@ -1,7 +1,7 @@
 // Epilogue · The Unseen Garden — saplings split concrete; the revolution grows at the speed of soil.
 import * as THREE from 'three';
-import { Zone, mat, emat, box, cyl, ground, bounds, sky, glowPanel, reveal, glowSprite } from '../world.js';
-import { textPanel, gardenGroundTexture, skyGradient, glowTexture } from '../textures.js';
+import { Zone, mat, emat, box, cyl, ground, bounds, sky, glowPanel, reveal, glowSprite, aoBlob } from '../world.js';
+import { textPanel, gardenGroundTexture, paintedSky, noiseNormalTexture, glowTexture } from '../textures.js';
 import { fireflies } from '../particles.js';
 
 function tree(z, x, zz, scale = 1, lean = 0) {
@@ -56,9 +56,16 @@ export function buildGarden(world) {
   });
   world.register(z);
 
-  // ---- dawn ----
+  // ---- dawn: warm cumulus catching first light ----
   sky(z, new THREE.MeshBasicMaterial({
-    map: skyGradient([[0, '#7ab0d8'], [0.45, '#e8c890'], [0.7, '#f4a868'], [0.85, '#e88858'], [1, '#caa070']]),
+    map: paintedSky({
+      stops: [[0, '#6aa4d4'], [0.4, '#e8c890'], [0.66, '#f4a868'], [0.84, '#e88858'], [1, '#caa070']],
+      clouds: [
+        { y: .26, count: 9, size: 44, color: 'rgba(255,235,215,.5)', rim: 'rgba(255,180,120,.3)', spread: .14 },
+        { y: .46, count: 10, size: 30, color: 'rgba(255,220,190,.42)', rim: 'rgba(255,160,100,.32)', spread: .1 },
+        { y: .62, count: 6, size: 20, color: 'rgba(255,205,170,.4)', rim: 'rgba(255,150,90,.3)', spread: .06 },
+      ],
+    }),
   }));
   const sunGlow = glowSprite(z, glowTexture('rgba(255,230,180,1)'), 0xffe2b0, 90, 140, 60, -260, .95);
   sunGlow.material.fog = false;
@@ -75,7 +82,7 @@ export function buildGarden(world) {
   z.add(sun);
   z.add(sun.target);
 
-  ground(z, 240, gardenGroundTexture());
+  ground(z, 240, gardenGroundTexture(), { normal: noiseNormalTexture({ strength: 1.8 }), normalScale: .7 });
   bounds(z, 56);
 
   // ---- the grove ----
@@ -84,7 +91,15 @@ export function buildGarden(world) {
     [-8, -34, 1.8, -.04], [20, 2, 1, .08], [-34, 6, 1.2, -.1], [34, -12, 1.1, .05],
     [6, -44, 1.3, 0], [-20, 14, .9, .06], [30, 16, 1, -.05], [-38, -12, 1, 0],
   ];
-  for (const [tx, tz, s, lean] of treeSpots) tree(z, tx, tz, s, lean);
+  for (const [tx, tz, s, lean] of treeSpots) {
+    tree(z, tx, tz, s, lean);
+    aoBlob(z, tx, tz, 2.6 * s, .35);
+  }
+  aoBlob(z, -18, 8, 2.2, .4);          // plinth
+  aoBlob(z, 22, 18, 4, .35);           // seed library
+  aoBlob(z, 0, 6, 5.6, .3);            // story circle
+  aoBlob(z, -34, -40, 8, .35);         // fallen smokestack
+  for (let i = 0; i < 4; i++) aoBlob(z, -10 + i * 7, -22, 1.9, .4); // old racks
   for (let i = 0; i < 12; i++) {
     sapling(z, (Math.random() - .5) * 70, (Math.random() - .5) * 70, .7 + Math.random() * .9);
   }

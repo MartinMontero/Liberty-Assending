@@ -210,3 +210,42 @@ export function embers({ x = 0, y = 0, z = 0, radius = 3, count = 40, color = [1
     },
   });
 }
+
+// Layered billboard flame — reads as actual fire, not dots.
+import { flameTexture } from './textures.js';
+
+let flameTex = null;
+
+export class FlameSprite {
+  constructor({ x = 0, y = 0, z = 0, w = 1.4, h = 2.4, layers = 2, opacity = .95 } = {}) {
+    if (!flameTex) flameTex = flameTexture();
+    this.group = new THREE.Group();
+    this.group.position.set(x, y, z);
+    this.w = w; this.h = h;
+    this.sprites = [];
+    for (let i = 0; i < layers; i++) {
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: flameTex, transparent: true, opacity: opacity * (1 - i * .3),
+        blending: THREE.AdditiveBlending, depthWrite: false,
+        rotation: (i - layers / 2) * .12,
+      }));
+      s.scale.set(w * (1 - i * .18), h * (1 - i * .12), 1);
+      s.position.y = h * .42 + i * h * .05;
+      this.group.add(s);
+      this.sprites.push(s);
+    }
+    this.phase = Math.random() * 9;
+  }
+
+  update(t) {
+    for (let i = 0; i < this.sprites.length; i++) {
+      const s = this.sprites[i];
+      const f1 = Math.sin(t * 11 + this.phase + i * 2.1);
+      const f2 = Math.sin(t * 23 + this.phase * 2 + i);
+      s.scale.x = this.w * (1 - i * .18) * (1 + f1 * .1 + f2 * .05);
+      s.scale.y = this.h * (1 - i * .12) * (1 + f2 * .14 + f1 * .04);
+      s.material.rotation = (i - 1) * .1 + f1 * .07;
+      s.material.opacity = (.95 - i * .28) * (.82 + .18 * Math.abs(f2));
+    }
+  }
+}

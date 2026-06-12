@@ -1,7 +1,7 @@
 // Zone infrastructure: each story location is a Zone (group + colliders +
 // ambience + flare-reveals + per-frame updaters), laid out far apart in one scene.
 import * as THREE from 'three';
-import { textPanel } from './textures.js';
+import { textPanel, aoTexture } from './textures.js';
 
 export class Zone {
   constructor(def) {
@@ -128,15 +128,49 @@ export function cyl(zone, rTop, rBot, h, material, x, y, z, { seg = 14, collide 
   return m;
 }
 
-export function ground(zone, size, texture, { color = 0xffffff, rough = .95 } = {}) {
+export function ground(zone, size, texture, { color = 0xffffff, rough = .95, normal = null, normalScale = .6 } = {}) {
+  const matOpts = { map: texture, color, roughness: rough, metalness: 0 };
+  if (normal) {
+    matOpts.normalMap = normal;
+    matOpts.normalScale = new THREE.Vector2(normalScale, normalScale);
+  }
   const g = new THREE.Mesh(
     new THREE.PlaneGeometry(size, size),
-    new THREE.MeshStandardMaterial({ map: texture, color, roughness: rough, metalness: 0 }),
+    new THREE.MeshStandardMaterial(matOpts),
   );
   g.rotation.x = -Math.PI / 2;
   g.receiveShadow = true;
   zone.add(g);
   return g;
+}
+
+// Cheap grounded look: a soft dark contact-shadow blob under a prop.
+let _aoTex = null;
+export function aoBlob(zone, x, z, radius = 2, opacity = .55, y = .02) {
+  if (!_aoTex) _aoTex = aoTexture();
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(radius * 2, radius * 2),
+    new THREE.MeshBasicMaterial({ map: _aoTex, transparent: true, opacity, depthWrite: false }),
+  );
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(x, y, z);
+  m.renderOrder = 1;
+  zone.add(m);
+  return m;
+}
+
+// Sagging cable between two points (factory dressing).
+export function cable(zone, ax, ay, az, bx, by, bz, sag = 1.2, r = .035, color = 0x141312) {
+  const mid = new THREE.Vector3((ax + bx) / 2, Math.min(ay, by) - sag, (az + bz) / 2);
+  const curve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(ax, ay, az), mid, new THREE.Vector3(bx, by, bz),
+  ]);
+  const m = new THREE.Mesh(
+    new THREE.TubeGeometry(curve, 14, r, 5),
+    new THREE.MeshStandardMaterial({ color, roughness: .65, metalness: .5 }),
+  );
+  zone.add(m);
+  return m;
 }
 
 export function bounds(zone, half) {

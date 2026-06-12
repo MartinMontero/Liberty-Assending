@@ -1,7 +1,7 @@
 // Chapter 5 · DAO of the Dead — a necropolis of glass coffins stacked like server racks.
 import * as THREE from 'three';
-import { Zone, mat, emat, box, cyl, ground, bounds, sky, glowPanel, reveal, glowSprite } from '../world.js';
-import { textPanel, grimeTexture, skyGradient, starsTexture, glowTexture } from '../textures.js';
+import { Zone, mat, emat, box, cyl, ground, bounds, sky, glowPanel, reveal, glowSprite, aoBlob } from '../world.js';
+import { textPanel, grimeTexture, skyGradient, starsTexture, glowTexture, noiseNormalTexture } from '../textures.js';
 import { fireflies, smoke } from '../particles.js';
 
 export function buildNecropolis(world) {
@@ -36,7 +36,7 @@ export function buildNecropolis(world) {
   moonLight.position.set(-60, 80, -90);
   z.add(moonLight);
 
-  ground(z, 240, grimeTexture('#0c0f14', '#04050a', '#1a2030', 2400));
+  ground(z, 240, grimeTexture('#0c0f14', '#04050a', '#1a2030', 2400), { normal: noiseNormalTexture({ strength: 2 }), normalScale: .7 });
   bounds(z, 54);
 
   // ground mist
@@ -243,6 +243,12 @@ export function buildNecropolis(world) {
   const drift = fireflies({ box: [80, 7, 80], cy: 4, count: 70, color: [.55, .75, 1], size: .13 });
   z.add(drift.points);
   z.onUpdate((dt) => drift.update(dt));
+
+  // contact shadows
+  for (const rd of rackDefs) aoBlob(z, rd.x, rd.zz, 2.6, .5);
+  aoBlob(z, 0, -12, 3.2, .5);   // Maria's shrine
+  aoBlob(z, 0, -40, 5.6, .55);  // the hydra
+  for (const [mx, mz] of [[-30, -30], [30, -28], [28, 14]]) aoBlob(z, mx, mz, 5.4, .5);
 
   // ---- reveals ----
   reveal(z, { lines: ['THEY FARM', 'GENERATIONAL GRIEF'], w: 18, h: 6, x: 0, y: 5.5, z: 22, color: '#ff6a7a' });

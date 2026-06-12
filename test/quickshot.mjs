@@ -1,0 +1,34 @@
+import { chromium } from 'playwright';
+const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--mute-audio'] });
+const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+const errs = [];
+page.on('pageerror', e => errs.push(String(e)));
+page.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+await page.goto('http://localhost:8723/index.html?test=1');
+await page.waitForFunction('window.__gameReady === true', { timeout: 30000 });
+await sleep(1600);
+await page.evaluate(() => { document.getElementById('narration').style.opacity = 0; document.getElementById('titlecard').style.opacity = 0; document.getElementById('toast').style.opacity = 0; });
+// walk to torch & take it so the view-model is in frame
+await page.keyboard.down('Shift'); await page.keyboard.down('w');
+await page.waitForFunction(() => Math.hypot(window.game.state.pos.x, window.game.state.pos.z - 14) < 3, { timeout: 40000 });
+await page.keyboard.up('w'); await page.keyboard.up('Shift');
+await page.evaluate(() => window.game.use());
+await sleep(400);
+await page.evaluate(() => { document.getElementById('toast').style.opacity = 0; });
+await page.evaluate(() => window.game.look(0.62, 0.08));
+await sleep(500);
+await page.screenshot({ path: 'test/shots/q-factory-billboard.png' });
+await page.evaluate(() => window.game.look(0, 0.05));
+await sleep(400);
+await page.screenshot({ path: 'test/shots/q-factory-front.png' });
+// walk into the hall toward a fire for the flame test
+await page.evaluate(() => window.game.look(-0.45, 0.02));
+await page.keyboard.down('Shift'); await page.keyboard.down('w');
+await page.waitForFunction(() => window.game.state.pos.z < -12, { timeout: 40000 });
+await page.keyboard.up('w'); await page.keyboard.up('Shift');
+await page.evaluate(() => window.game.look(-0.6, 0.04));
+await sleep(500);
+await page.screenshot({ path: 'test/shots/q-factory-fire.png' });
+console.log('errors:', errs.length ? errs : 'none');
+await browser.close();

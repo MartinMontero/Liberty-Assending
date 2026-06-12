@@ -1,7 +1,7 @@
 // Chapter 4 · The NFT Gulag — a neon bazaar where rebellion is resold.
 import * as THREE from 'three';
-import { Zone, mat, emat, box, cyl, ground, bounds, sky, glowPanel, reveal } from '../world.js';
-import { textPanel, grimeTexture, skyGradient, nftArtTexture } from '../textures.js';
+import { Zone, mat, emat, box, cyl, ground, bounds, sky, glowPanel, reveal, aoBlob } from '../world.js';
+import { textPanel, grimeTexture, paintedSky, noiseNormalTexture, nftArtTexture } from '../textures.js';
 import { fireflies } from '../particles.js';
 
 export function buildGulag(world) {
@@ -21,11 +21,18 @@ export function buildGulag(world) {
   world.register(z);
 
   sky(z, new THREE.MeshBasicMaterial({
-    map: skyGradient([[0, '#02010a'], [0.55, '#140a2e'], [0.8, '#3a1456'], [1, '#0a0518']]),
+    map: paintedSky({
+      stops: [[0, '#02010a'], [0.55, '#140a2e'], [0.8, '#3a1456'], [1, '#0a0518']],
+      stars: 240,
+      clouds: [
+        { y: .34, count: 7, size: 56, color: 'rgba(140,50,200,.16)', spread: .2 },
+        { y: .55, count: 6, size: 40, color: 'rgba(70,40,180,.18)', rim: 'rgba(255,80,200,.1)', spread: .14 },
+      ],
+    }),
   }));
   const hemi = new THREE.HemisphereLight(0x8a6ac0, 0x1a1028, 1.0);
   z.add(hemi);
-  ground(z, 240, grimeTexture('#241a36', '#0e0a18', '#3e3054', 2600));
+  ground(z, 240, grimeTexture('#241a36', '#0e0a18', '#3e3054', 2600), { normal: noiseNormalTexture({ strength: 1.6 }), normalScale: .6 });
   bounds(z, 54);
 
   // neon guide-strips along the bazaar alley
@@ -231,6 +238,15 @@ export function buildGulag(world) {
       shard.position.y += Math.sin(t * .9 + i) * .003;
     });
   }
+
+  // contact shadows
+  for (let i = 0; i < 6; i++) {
+    aoBlob(z, (i % 2 === 0 ? -1 : 1) * 10, 18 - Math.floor(i / 2) * 16, 4.4, .45);
+  }
+  aoBlob(z, 0, -12, 2.8, .5);    // relic podium
+  aoBlob(z, 0, -38, 6.5, .5);    // kingpin
+  aoBlob(z, -24, -8, 6.4, .42);  // sweatshop
+  aoBlob(z, 22, 4, 8.4, .4);     // trading pit
 
   // ---- reveals ----
   reveal(z, { lines: ['DISSENT → LIQUIDITY POOL'], w: 22, h: 3, x: 0, y: 6.5, z: 24, color: '#ff9ad5' });
