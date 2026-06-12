@@ -1,0 +1,5 @@
+node_modules/
+test/shots/
+test/smoke.png
+nohup.out
+*.log

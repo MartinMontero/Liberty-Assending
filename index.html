@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Liberty Ascending — The Torchbearer</title>
+<style>
+  :root {
+    --blue: #2e4fa3; --white: #f4efe6; --red: #b3262e;
+    --gold: #e8b04b; --ink: #0a0a0e;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--ink); }
+  body { font-family: Georgia, 'Times New Roman', serif; color: var(--white); }
+  canvas { display: block; }
+  .mono { font-family: 'Courier New', monospace; }
+
+  #app { position: fixed; inset: 0; }
+
+  /* ---------- permanent overlays ---------- */
+  #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 5;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.55) 100%); }
+  #flarefx { position: fixed; inset: 0; pointer-events: none; z-index: 6; opacity: 0;
+    background: radial-gradient(ellipse at center, rgba(255,214,140,.18), transparent 60%);
+    transition: opacity .25s; }
+  #fade { position: fixed; inset: 0; background: #000; z-index: 40; opacity: 1;
+    transition: opacity .7s ease; pointer-events: none; }
+
+  /* ---------- HUD ---------- */
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+  #crosshair { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); }
+  #crosshair .dot { width: 4px; height: 4px; border-radius: 50%; background: rgba(244,239,230,.9);
+    box-shadow: 0 0 6px rgba(244,239,230,.7); }
+
+  #prompt { position: absolute; left: 50%; top: 56%; transform: translateX(-50%);
+    font-size: 17px; letter-spacing: .06em; color: var(--gold);
+    text-shadow: 0 0 12px rgba(232,176,75,.5), 0 2px 4px #000;
+    opacity: 0; transition: opacity .2s; white-space: nowrap; }
+
+  #toast { position: absolute; left: 50%; top: 12%; transform: translateX(-50%);
+    max-width: 720px; text-align: center; font-style: italic; font-size: 19px; line-height: 1.5;
+    color: var(--white); text-shadow: 0 2px 6px #000, 0 0 18px rgba(0,0,0,.8);
+    opacity: 0; transition: opacity .6s; padding: 0 20px; }
+
+  #zonecard { position: absolute; left: 28px; bottom: 26px; max-width: 360px; }
+  #zonecard .tric { width: 64px; height: 3px; margin-bottom: 8px;
+    background: linear-gradient(90deg, var(--blue) 33%, var(--white) 33% 66%, var(--red) 66%); }
+  #zonecard .zname { font-size: 21px; letter-spacing: .14em; text-transform: uppercase;
+    text-shadow: 0 2px 8px #000; }
+  #zonecard .zch { font-size: 12.5px; letter-spacing: .2em; text-transform: uppercase;
+    color: rgba(244,239,230,.62); margin-top: 3px; }
+  #objective { font-size: 14.5px; color: var(--gold); margin-top: 10px; font-style: italic;
+    text-shadow: 0 1px 4px #000; transition: opacity .4s; }
+
+  #hints { position: absolute; right: 26px; bottom: 24px; text-align: right;
+    font-family: 'Courier New', monospace; font-size: 12.5px; line-height: 1.85;
+    color: rgba(244,239,230,.55); text-shadow: 0 1px 3px #000; }
+  #hints b { color: rgba(232,176,75,.85); font-weight: 700; }
+
+  /* ---------- title card ---------- */
+  #titlecard { position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; z-index: 20; pointer-events: none;
+    opacity: 0; transition: opacity 1s; text-align: center; }
+  #titlecard .tch { font-size: 14px; letter-spacing: .42em; text-transform: uppercase;
+    color: var(--gold); margin-bottom: 14px; text-shadow: 0 0 14px rgba(232,176,75,.6); }
+  #titlecard .tname { font-size: 54px; letter-spacing: .1em; text-shadow: 0 4px 30px #000, 0 0 40px rgba(0,0,0,.9); }
+  #titlecard .trule { width: 220px; height: 3px; margin-top: 22px;
+    background: linear-gradient(90deg, var(--blue) 33%, var(--white) 33% 66%, var(--red) 66%); }
+
+  /* ---------- narration ---------- */
+  #narration { position: fixed; left: 50%; bottom: 92px; transform: translateX(-50%);
+    width: min(820px, 86vw); z-index: 12; pointer-events: none;
+    background: linear-gradient(180deg, rgba(8,8,12,.82), rgba(8,8,12,.88));
+    border-left: 3px solid var(--gold); border-right: 3px solid var(--gold);
+    padding: 18px 26px 16px; opacity: 0; transition: opacity .7s;
+    box-shadow: 0 8px 40px rgba(0,0,0,.6); }
+  #narration .nbody { font-size: 16.5px; line-height: 1.62; color: #efe9dc; }
+  #narration .nquote { margin-top: 10px; font-style: italic; font-size: 14.5px; color: var(--gold); }
+  #narration .nhint { margin-top: 8px; font-family: 'Courier New', monospace; font-size: 11px;
+    color: rgba(244,239,230,.45); letter-spacing: .12em; text-transform: uppercase; }
+
+  /* ---------- travel modal ---------- */
+  #travel { position: fixed; inset: 0; z-index: 30; display: none;
+    align-items: center; justify-content: center;
+    background: rgba(4,4,8,.78); backdrop-filter: blur(3px); }
+  #travel.open { display: flex; }
+  #travel .panel { width: min(860px, 92vw); max-height: 88vh; overflow-y: auto;
+    background: linear-gradient(180deg, #11111a, #0b0b12);
+    border: 1px solid rgba(232,176,75,.35); box-shadow: 0 0 60px rgba(0,0,0,.8);
+    padding: 30px 34px 26px; }
+  #travel h2 { margin: 0 0 4px; font-size: 24px; letter-spacing: .12em; font-weight: normal; }
+  #travel .sub { font-size: 13px; color: rgba(244,239,230,.55); font-style: italic; margin-bottom: 18px; }
+  #askrow { display: flex; gap: 10px; margin-bottom: 8px; }
+  #askinput { flex: 1; background: #07070c; border: 1px solid rgba(232,176,75,.4); color: var(--white);
+    font-family: 'Courier New', monospace; font-size: 15px; padding: 12px 14px; outline: none; }
+  #askinput:focus { border-color: var(--gold); box-shadow: 0 0 14px rgba(232,176,75,.25); }
+  #askgo { background: var(--gold); color: #14100a; border: 0; font-family: Georgia, serif;
+    font-size: 15px; letter-spacing: .08em; padding: 0 26px; cursor: pointer; }
+  #askgo:hover { background: #f5c266; }
+  #askreply { min-height: 20px; font-style: italic; font-size: 13.5px; color: var(--gold);
+    margin-bottom: 14px; }
+  #destgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+  .dest { border: 1px solid rgba(244,239,230,.14); background: rgba(255,255,255,.025);
+    padding: 13px 15px; cursor: pointer; transition: all .15s; }
+  .dest:hover { border-color: var(--gold); background: rgba(232,176,75,.08); transform: translateY(-1px); }
+  .dest.visited { border-left: 3px solid var(--gold); }
+  .dest .dch { font-family: 'Courier New', monospace; font-size: 10.5px; letter-spacing: .18em;
+    color: rgba(232,176,75,.8); text-transform: uppercase; }
+  .dest .dname { font-size: 16.5px; margin: 3px 0 4px; }
+  .dest .ddesc { font-size: 12px; color: rgba(244,239,230,.55); line-height: 1.45; font-style: italic; }
+  #travel .close { margin-top: 18px; text-align: center; font-family: 'Courier New', monospace;
+    font-size: 12px; color: rgba(244,239,230,.45); letter-spacing: .15em; }
+
+  /* ---------- help ---------- */
+  #help { position: fixed; inset: 0; z-index: 28; display: none; align-items: center; justify-content: center;
+    background: rgba(4,4,8,.82); }
+  #help.open { display: flex; }
+  #help .panel { width: min(560px, 90vw); background: #0d0d15; border: 1px solid rgba(232,176,75,.35);
+    padding: 28px 34px; }
+  #help h2 { font-weight: normal; letter-spacing: .12em; margin: 0 0 16px; }
+  #help table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  #help td { padding: 6.5px 4px; border-bottom: 1px solid rgba(244,239,230,.08); }
+  #help td:first-child { font-family: 'Courier New', monospace; color: var(--gold); width: 130px; }
+
+  /* ---------- intro / loading ---------- */
+  #intro { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    background: radial-gradient(ellipse at 50% 35%, #181826 0%, #07070c 70%);
+    transition: opacity 1s; }
+  #intro .itric { width: 130px; height: 4px; margin: 26px 0;
+    background: linear-gradient(90deg, var(--blue) 33%, var(--white) 33% 66%, var(--red) 66%); }
+  #intro h1 { font-size: clamp(38px, 7vw, 64px); margin: 0; letter-spacing: .14em; font-weight: normal;
+    text-shadow: 0 0 50px rgba(232,176,75,.25); }
+  #intro .isub { font-size: 15px; letter-spacing: .34em; text-transform: uppercase;
+    color: rgba(244,239,230,.6); margin-top: 12px; }
+  #intro .iquote { max-width: 620px; font-style: italic; font-size: 16px; line-height: 1.7;
+    color: rgba(244,239,230,.78); margin: 8px 24px 0; }
+  #intro .iquote .qa { display: block; margin-top: 8px; font-size: 13px; color: var(--gold);
+    font-style: normal; letter-spacing: .15em; }
+  #begin { margin-top: 44px; font-size: 17px; letter-spacing: .3em; color: var(--gold);
+    border: 1px solid rgba(232,176,75,.5); padding: 15px 44px; cursor: pointer;
+    background: rgba(232,176,75,.06); transition: all .2s; animation: pulse 2.2s infinite; }
+  #begin:hover { background: rgba(232,176,75,.18); box-shadow: 0 0 30px rgba(232,176,75,.3); }
+  #intro .ictl { margin-top: 30px; font-family: 'Courier New', monospace; font-size: 12px;
+    color: rgba(244,239,230,.45); line-height: 1.9; letter-spacing: .08em; }
+  #intro .iload { margin-top: 18px; font-family: 'Courier New', monospace; font-size: 11px;
+    color: rgba(244,239,230,.35); letter-spacing: .2em; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+
+  /* ---------- finale ---------- */
+  #finale { position: fixed; inset: 0; z-index: 35; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; pointer-events: none;
+    opacity: 0; transition: opacity 2s; }
+  #finale .fbig { font-size: clamp(26px, 4.4vw, 44px); letter-spacing: .12em; font-style: italic;
+    text-shadow: 0 4px 30px #000; max-width: 800px; }
+  #finale .fsmall { margin-top: 18px; font-size: 14px; letter-spacing: .3em; text-transform: uppercase;
+    color: var(--gold); }
+
+  #err { position: fixed; inset: 0; z-index: 90; display: none; align-items: center; justify-content: center;
+    background: #07070c; color: var(--white); font-size: 16px; text-align: center; padding: 40px; }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three/three.module.js",
+    "three/addons/": "./vendor/three/addons/"
+  }
+}
+</script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <div id="vignette"></div>
+  <div id="flarefx"></div>
+
+  <div id="hud">
+    <div id="crosshair"><div class="dot"></div></div>
+    <div id="prompt"></div>
+    <div id="toast"></div>
+    <div id="zonecard">
+      <div class="tric"></div>
+      <div class="zname" id="zname"></div>
+      <div class="zch" id="zch"></div>
+      <div id="objective"></div>
+    </div>
+    <div id="hints">
+      <b>WASD</b> move &nbsp;·&nbsp; <b>SHIFT</b> run &nbsp;·&nbsp; <b>SPACE</b> jump<br>
+      <b>E</b> interact &nbsp;·&nbsp; <b>LMB</b> flare torch<br>
+      <b>T</b> ask the torch to travel &nbsp;·&nbsp; <b>H</b> help
+    </div>
+  </div>
+
+  <div id="titlecard">
+    <div class="tch" id="tch"></div>
+    <div class="tname" id="tname"></div>
+    <div class="trule"></div>
+  </div>
+
+  <div id="narration">
+    <div class="nbody" id="nbody"></div>
+    <div class="nquote" id="nquote"></div>
+    <div class="nhint">X — dismiss</div>
+  </div>
+
+  <div id="travel">
+    <div class="panel">
+      <h2>SPEAK, AND THE TORCH WILL CARRY YOU</h2>
+      <div class="sub">Ask to go anywhere the story goes — “take me to Versailles”, “where the coffins are”, “the garden”…</div>
+      <div id="askrow">
+        <input id="askinput" type="text" placeholder="> where do you wish to go?" autocomplete="off" spellcheck="false">
+        <button id="askgo">GO</button>
+      </div>
+      <div id="askreply"></div>
+      <div id="destgrid"></div>
+      <div class="close">T or ESC — return to the world</div>
+    </div>
+  </div>
+
+  <div id="help">
+    <div class="panel">
+      <h2>THE TORCHBEARER’S HANDBOOK</h2>
+      <table>
+        <tr><td>MOUSE</td><td>look — click the world to take hold of it (pointer lock)</td></tr>
+        <tr><td>W A S D</td><td>move · SHIFT run · SPACE jump</td></tr>
+        <tr><td>E</td><td>interact — take up the torch, touch what glimmers</td></tr>
+        <tr><td>LMB (hold)</td><td>flare the torch — 1215&nbsp;nm reveals the Ring’s hidden architecture</td></tr>
+        <tr><td>T</td><td>ask the torch to carry you to any chapter of the story</td></tr>
+        <tr><td>X</td><td>dismiss narration</td></tr>
+        <tr><td>N</td><td>mute / unmute ambience</td></tr>
+        <tr><td>H or ESC</td><td>close this handbook</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div id="finale">
+    <div class="fbig" id="fbig"></div>
+    <div class="fsmall" id="fsmall"></div>
+  </div>
+
+  <div id="intro">
+    <h1>LIBERTY ASCENDING</h1>
+    <div class="isub">A Revolutionary Fable — Playable Edition</div>
+    <div class="itric"></div>
+    <div class="iquote">
+      “She carried no weapon but a torch — a salvaged LED strip jury-rigged to pulse at 1215&nbsp;nm,
+      wavelength of awakening. The workers called her Liberty.”
+      <span class="qa">— CHAPTER 1 · THE SMOKESTACK GOSPEL</span>
+    </div>
+    <div id="begin">TAKE UP THE TORCH</div>
+    <div class="ictl">
+      WASD move · MOUSE look · E interact · LMB flare the torch<br>
+      T — ask the torch to carry you anywhere in the story
+    </div>
+    <div class="iload" id="iload">FORGING THE WORLD…</div>
+  </div>
+
+  <div id="fade"></div>
+  <div id="err"></div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
